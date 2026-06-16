@@ -1,0 +1,84 @@
+# generated: 2026-06-16
+# last_updated: 2026-06-16
+# project: aine-bmad
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: {project-root}/_bmad-output/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog -> in-progress: Automatically when first story is created (via create-story)
+#   - in-progress -> done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - Developer typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+# - TEST-FIRST DISCIPLINE: every implementation story writes tests first (red), code makes them
+#   green; tests and code land in the SAME change. No story is 'done' with code ahead of its tests.
+
+generated: 2026-06-16
+last_updated: 2026-06-16
+project: aine-bmad
+project_key: NOKEY
+tracking_system: file-system
+story_location: "{project-root}/_bmad-output/implementation-artifacts"
+
+development_status:
+  # --- Epic 1: Runnable Foundation & Walking Skeleton ---
+  # One-command-runnable full stack + QA infra (Vitest/RTL/Playwright + CI + docker-compose.test)
+  # from the first commit, ending in an end-to-end empty-list slice.
+  epic-1: in-progress
+  1-1-scaffold-repository-test-harness-and-ci: in-progress
+  1-2-backend-foundation-db-migrations-repository-api-skeleton: backlog
+  1-3-one-command-docker-compose-bring-up: backlog
+  1-4-frontend-skeleton-tokens-shell-usetodos-loading-and-empty-states: backlog
+  epic-1-retrospective: optional
+
+  # --- Epic 2: The Complete Todo Experience ---
+  # Vertical CRUD slices (route + service + repository + component) with UX states,
+  # accessibility, error handling, and tests built into each story.
+  epic-2: backlog
+  2-1-render-the-populated-todo-list: backlog
+  2-2-create-a-todo: backlog
+  2-3-update-a-todo-complete-uncomplete-and-edit-description: backlog
+  2-4-delete-a-todo-with-confirmation: backlog
+  2-5-error-handling-and-in-flight-reliability: backlog
+  epic-2-retrospective: optional
+
+  # --- Epic 3: Quality, Accessibility & Reliability Verification ---
+  # >=5 Playwright E2E + >=70% coverage gate in CI, WCAG 2.1 AA audit (zero critical),
+  # security review of baseline hardening.
+  epic-3: backlog
+  3-1-e2e-suite-5-playwright-coverage-gate-70: backlog
+  3-2-accessibility-audit-zero-critical-wcag-2-1-aa-violations: backlog
+  3-3-security-review-of-baseline-hardening: backlog
+  epic-3-retrospective: optional
+
+  # --- Epic 4: Deliverable Documentation & Reporting ---
+  # README, QA report + coverage evidence, accessibility + security reports, AI integration log.
+  epic-4: backlog
+  4-1-readme-d-6: backlog
+  4-2-qa-report-coverage-evidence-d-7: backlog
+  4-3-accessibility-and-security-review-reports-d-8-d-9: backlog
+  4-4-ai-integration-log-d-10: backlog
+  epic-4-retrospective: optional

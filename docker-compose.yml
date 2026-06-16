@@ -1,0 +1,3 @@
+# Placeholder — full topology (backend, frontend, db, nginx) is Story 1.3.
+# Intentionally empty for now.
+services: {}

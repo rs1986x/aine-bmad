@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Test / coverage artifacts
+coverage/
+playwright-report/
+test-results/
+
+# Environment files (never commit real secrets; .env.example IS committed)
+.env
+.env.test
+*.local
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/

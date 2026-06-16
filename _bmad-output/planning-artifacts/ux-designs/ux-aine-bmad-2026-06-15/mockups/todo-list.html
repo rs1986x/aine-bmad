@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Todo App — Key-Screen Mock</title>
+<style>
+  /* Tokens mirrored from DESIGN.md (spine wins on conflict). */
+  :root {
+    --surface-base: #F6F7F9;
+    --surface-raised: #FFFFFF;
+    --surface-sunken: #EEF0F3;
+    --ink-primary: #1A1D21;
+    --ink-secondary: #5B6470;
+    --ink-muted: #6B7480;
+    --ink-disabled: #A2AAB4;
+    --accent: #2563EB;
+    --accent-hover: #1D4ED8;
+    --accent-foreground: #FFFFFF;
+    --accent-subtle: #EAF0FE;
+    --danger: #DC2626;
+    --danger-hover: #B91C1C;
+    --danger-text: #B42318;
+    --danger-foreground: #FFFFFF;
+    --danger-subtle: #FDECEC;
+    --border-hairline: #E4E7EC;
+    --border-strong: #8B94A1;
+    --focus-ring: #2563EB;
+    --focus-ring-offset: #FFFFFF;
+    --r-sm: 6px; --r-md: 10px; --r-lg: 14px;
+    --font: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--surface-base); color: var(--ink-primary);
+    font-family: var(--font); font-size: 16px; line-height: 1.5;
+    padding: 32px 16px;
+  }
+  .gallery { display: flex; flex-wrap: wrap; gap: 32px; justify-content: center; align-items: flex-start; }
+  .panel { width: 100%; max-width: 640px; }
+  .panel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-secondary); margin: 0 0 8px; font-weight: 600; }
+  .app { background: var(--surface-base); border: 1px solid var(--border-hairline); border-radius: var(--r-lg); padding: 24px; }
+  .app h1 { font-size: 28px; font-weight: 600; letter-spacing: -.01em; margin: 0 0 16px; }
+
+  /* Add input */
+  .add { display: flex; gap: 12px; margin-bottom: 20px; }
+  .add input {
+    flex: 1; font: inherit; padding: 12px 16px; color: var(--ink-primary);
+    background: var(--surface-raised); border: 1px solid var(--border-strong); border-radius: var(--r-md);
+  }
+  .add input::placeholder { color: var(--ink-secondary); }
+  .add input:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-color: var(--accent); }
+  .btn { font: inherit; font-weight: 500; border: none; border-radius: var(--r-md); padding: 12px 16px; cursor: pointer; }
+  .btn-primary { background: var(--accent); color: var(--accent-foreground); }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-secondary { background: var(--surface-raised); color: var(--ink-primary); border: 1px solid var(--border-strong); }
+  .btn-danger { background: var(--danger); color: var(--danger-foreground); }
+  .btn-danger:hover { background: var(--danger-hover); }
+  .btn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+  .btn-primary:focus-visible, .btn-danger:focus-visible { outline-color: var(--focus-ring); box-shadow: 0 0 0 2px var(--focus-ring-offset), 0 0 0 4px var(--focus-ring); outline: none; }
+
+  /* Group label */
+  .group-label { font-size: 13px; font-weight: 600; color: var(--ink-secondary); margin: 4px 2px 8px; }
+
+  /* Todo rows */
+  ul.list { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .row {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--surface-raised); border: 1px solid var(--border-hairline);
+    border-radius: var(--r-md); padding: 12px 16px;
+  }
+  .row:hover { background: #FAFBFC; }
+  .check {
+    appearance: none; width: 22px; height: 22px; flex: none; margin: 0;
+    border: 1.5px solid var(--border-strong); border-radius: var(--r-sm); background: var(--surface-raised); cursor: pointer; position: relative;
+  }
+  .check:checked { background: var(--accent); border-color: var(--accent); }
+  .check:checked::after { content: ""; position: absolute; left: 6px; top: 2px; width: 5px; height: 10px; border: solid var(--accent-foreground); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+  .check:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+  .desc { flex: 1; }
+  .meta { font-size: 13px; color: var(--ink-secondary); flex: none; }
+  .row.completed .desc { text-decoration: line-through; color: var(--ink-muted); }
+  .actions { display: flex; gap: 4px; flex: none; }
+  .icon { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--r-sm); border: none; background: transparent; color: var(--ink-secondary); cursor: pointer; font-size: 15px; }
+  .icon:hover { color: var(--ink-primary); background: var(--surface-sunken); }
+
+  /* Edit mode row */
+  .row.editing { background: var(--accent-subtle); border-color: var(--accent); }
+  .row.editing input { flex: 1; font: inherit; padding: 6px 10px; border: 1px solid var(--accent); border-radius: var(--r-sm); }
+  .btn-sm { padding: 6px 12px; font-size: 14px; }
+
+  /* Empty state */
+  .empty { text-align: center; padding: 32px 16px; }
+  .empty h3 { font-size: 28px; font-weight: 600; margin: 0 0 8px; }
+  .empty p { color: var(--ink-secondary); margin: 0; }
+
+  /* Error banner */
+  .error { background: var(--danger-subtle); color: var(--danger-text); border: 1px solid var(--danger); border-radius: var(--r-md); padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .error .btn-secondary { color: var(--danger-text); border-color: var(--danger); }
+
+  /* Skeleton */
+  .skel { height: 48px; background: var(--surface-sunken); border-radius: var(--r-md); margin-bottom: 8px; }
+
+  /* Dialog */
+  .scrim { background: rgba(20,29,33,.45); border-radius: var(--r-lg); padding: 40px 16px; }
+  .dialog { background: var(--surface-raised); border-radius: var(--r-lg); padding: 24px; max-width: 380px; margin: 0 auto; box-shadow: 0 12px 32px rgba(20,29,33,.25); }
+  .dialog h3 { font-size: 20px; font-weight: 600; margin: 0 0 8px; }
+  .dialog p { color: var(--ink-secondary); margin: 0 0 20px; }
+  .dialog .buttons { display: flex; justify-content: flex-end; gap: 8px; }
+  .count { font-size: 13px; color: var(--ink-secondary); margin: 0 0 12px; }
+</style>
+</head>
+<body>
+<div class="gallery">
+
+  <div class="panel">
+    <h2>Normal — Active on top, Completed below (newest-first)</h2>
+    <div class="app">
+      <h1>Todos</h1>
+      <div class="add">
+        <input type="text" placeholder="Add a todo…" aria-label="Add a todo" />
+        <button class="btn btn-primary">Add</button>
+      </div>
+      <p class="count">2 todos left</p>
+      <p class="group-label">Active</p>
+      <ul class="list">
+        <li class="row">
+          <input class="check" type="checkbox" aria-label="Pick up dry cleaning" />
+          <span class="desc">Pick up dry cleaning</span>
+          <span class="meta">2:14 PM</span>
+          <span class="actions"><button class="icon" aria-label="Edit">✎</button><button class="icon" aria-label="Delete">🗑</button></span>
+        </li>
+        <li class="row">
+          <input class="check" type="checkbox" aria-label="Call the plumber" />
+          <span class="desc">Call the plumber</span>
+          <span class="meta">1:02 PM</span>
+          <span class="actions"><button class="icon" aria-label="Edit">✎</button><button class="icon" aria-label="Delete">🗑</button></span>
+        </li>
+      </ul>
+      <p class="group-label">Completed</p>
+      <ul class="list">
+        <li class="row completed">
+          <input class="check" type="checkbox" checked aria-label="Completed: Buy groceries" />
+          <span class="desc">Buy groceries</span>
+          <span class="meta">11:30 AM</span>
+          <span class="actions"><button class="icon" aria-label="Edit">✎</button><button class="icon" aria-label="Delete">🗑</button></span>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Inline edit + Empty + Error + Loading</h2>
+    <div class="app" style="margin-bottom:24px">
+      <h1>Todos</h1>
+      <div class="add">
+        <input type="text" placeholder="Add a todo…" aria-label="Add a todo" />
+        <button class="btn btn-primary">Add</button>
+      </div>
+      <ul class="list">
+        <li class="row editing">
+          <input class="check" type="checkbox" aria-label="editing" />
+          <input type="text" value="Call the plumber back" aria-label="Edit todo" />
+          <span class="actions"><button class="btn btn-primary btn-sm">Save</button><button class="btn btn-secondary btn-sm">Cancel</button></span>
+        </li>
+      </ul>
+    </div>
+
+    <div class="app" style="margin-bottom:24px">
+      <div class="error" role="alert">
+        <span>Couldn't load your todos.</span>
+        <button class="btn btn-secondary btn-sm">Retry</button>
+      </div>
+      <div class="skel"></div><div class="skel"></div><div class="skel"></div>
+    </div>
+
+    <div class="app">
+      <h1>Todos</h1>
+      <div class="add">
+        <input type="text" placeholder="Add a todo…" aria-label="Add a todo" />
+        <button class="btn btn-primary">Add</button>
+      </div>
+      <div class="empty">
+        <h3>No todos yet</h3>
+        <p>Add your first one above.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Delete confirmation dialog</h2>
+    <div class="scrim">
+      <div class="dialog" role="dialog" aria-labelledby="dt" aria-modal="true">
+        <h3 id="dt">Delete this todo?</h3>
+        <p>"Buy groceries" — this can't be undone.</p>
+        <div class="buttons">
+          <button class="btn btn-secondary">Cancel</button>
+          <button class="btn btn-danger">Delete</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
