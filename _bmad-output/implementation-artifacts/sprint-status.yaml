@@ -1,5 +1,5 @@
 # generated: 2026-06-16
-# last_updated: 2026-06-16
+# last_updated: 2026-06-17
 # project: aine-bmad
 # project_key: NOKEY
 # tracking_system: file-system
@@ -49,7 +49,7 @@ development_status:
   # from the first commit, ending in an end-to-end empty-list slice.
   epic-1: in-progress
   1-1-scaffold-repository-test-harness-and-ci: done
-  1-2-backend-foundation-db-migrations-repository-api-skeleton: backlog
+  1-2-backend-foundation-db-migrations-repository-api-skeleton: done
   1-3-one-command-docker-compose-bring-up: backlog
   1-4-frontend-skeleton-tokens-shell-usetodos-loading-and-empty-states: backlog
   epic-1-retrospective: optional

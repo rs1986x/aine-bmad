@@ -17,6 +17,15 @@ export default defineConfig([
     languageOptions: {
       globals: globals.node,
     },
+    rules: {
+      // Align ESLint with tsconfig's noUnusedParameters underscore convention.
+      // Required for genuinely-unused-but-mandatory params such as the Express
+      // error middleware's 4th `next` arg (detected by arity).
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
+      ],
+    },
   },
   {
     // Vitest exposes its API as globals (globals: true in vitest.config.ts).
