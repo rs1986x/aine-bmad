@@ -37,7 +37,7 @@
 #   green; tests and code land in the SAME change. No story is 'done' with code ahead of its tests.
 
 generated: 2026-06-16
-last_updated: 2026-06-16
+last_updated: 2026-06-16T17:30:00Z
 project: aine-bmad
 project_key: NOKEY
 tracking_system: file-system
@@ -48,7 +48,7 @@ development_status:
   # One-command-runnable full stack + QA infra (Vitest/RTL/Playwright + CI + docker-compose.test)
   # from the first commit, ending in an end-to-end empty-list slice.
   epic-1: in-progress
-  1-1-scaffold-repository-test-harness-and-ci: in-progress
+  1-1-scaffold-repository-test-harness-and-ci: done
   1-2-backend-foundation-db-migrations-repository-api-skeleton: backlog
   1-3-one-command-docker-compose-bring-up: backlog
   1-4-frontend-skeleton-tokens-shell-usetodos-loading-and-empty-states: backlog

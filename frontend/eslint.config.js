@@ -22,4 +22,24 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    // Vitest exposes its API as globals (globals: true in vite.config.ts).
+    files: ['**/*.{test,spec}.{ts,tsx}', '**/__tests__/**/*.{ts,tsx}'],
+    languageOptions: {
+      globals: {
+        describe: 'readonly',
+        it: 'readonly',
+        test: 'readonly',
+        expect: 'readonly',
+        suite: 'readonly',
+        vi: 'readonly',
+        beforeAll: 'readonly',
+        afterAll: 'readonly',
+        beforeEach: 'readonly',
+        afterEach: 'readonly',
+        expectTypeOf: 'readonly',
+        assert: 'readonly',
+      },
+    },
+  },
 ])
