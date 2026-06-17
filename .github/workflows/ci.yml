@@ -103,3 +103,49 @@ jobs:
           name: playwright-report
           path: e2e/playwright-report/
           retention-days: 7
+
+  compose-smoke:
+    name: Compose smoke (one-command bring-up)
+    runs-on: ubuntu-latest
+    # Independent of the frontend/backend/e2e jobs: this proves the PRODUCTION
+    # docker-compose.yml stack builds, comes up health-gated, serves the SPA, and
+    # reverse-proxies /api through nginx. It must fail the build on any failure.
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build images and bring the stack up health-gated
+        # Bounded wait so a container stuck `starting`/unhealthy fails fast
+        # instead of blocking until the GitHub job timeout.
+        run: docker compose up -d --build --wait --wait-timeout 180
+      - name: Poll /api/health until 200 (proxied through nginx)
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8080/api/health > /dev/null; then
+              echo "backend healthy via proxy"
+              exit 0
+            fi
+            echo "waiting for /api/health ($i)..."
+            sleep 2
+          done
+          echo "timed out waiting for /api/health"
+          exit 1
+      - name: Assert SPA is served at /
+        run: curl -fsS http://localhost:8080/ > /dev/null
+      - name: Assert proxied /api/health returns ok + db up
+        run: |
+          body=$(curl -fsS http://localhost:8080/api/health)
+          echo "Response: $body"
+          echo "$body" | grep -q '"status":"ok"'
+          echo "$body" | grep -q '"db":"up"'
+      - name: Assert proxied /api/todos returns 200 + empty list
+        # Proves the empty data path the EmptyState renders works end-to-end
+        # through nginx → backend → fresh db. Story 3.1 owns the browser E2E.
+        run: |
+          body=$(curl -fsS http://localhost:8080/api/todos)
+          echo "Response: $body"
+          echo "$body" | grep -qx '\[\]'
+      - name: Dump compose logs on failure
+        if: failure()
+        run: docker compose logs
+      - name: Tear down the stack
+        if: always()
+        run: docker compose down -v

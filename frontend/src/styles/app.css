@@ -1,0 +1,128 @@
+/* Global layout + component styles. All tokenized values reference tokens.css.
+   Light mode only (no prefers-color-scheme override). */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--color-surface-base);
+  color: var(--color-ink-primary);
+  font-family: var(--font-family);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-body);
+  line-height: var(--line-height-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Inherit type into form controls and keep inputs at >=16px to prevent
+   mobile zoom-on-focus (inputs land in Epic 2). */
+input,
+button,
+textarea,
+select {
+  font: inherit;
+}
+
+input,
+textarea,
+select {
+  font-size: max(16px, var(--font-size-body));
+}
+
+/* App shell — single centered column capped at container-max, page-margin gutters. */
+.app-shell {
+  max-width: var(--container-max);
+  margin-inline: auto;
+  padding-inline: var(--page-margin);
+  padding-block: var(--space-8);
+  min-height: 100svh;
+}
+
+/* LoadingSkeleton — todo-row silhouette rows in surface-sunken. */
+.loading-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.loading-skeleton__row {
+  height: 56px;
+  padding: var(--todo-row-padding);
+  border-radius: var(--todo-row-radius);
+  background: var(--color-surface-sunken);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .loading-skeleton__row {
+    animation: skeleton-pulse 1.4s ease-in-out infinite;
+  }
+}
+
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* EmptyState — centered display headline + body subline. */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-3);
+  padding-block: var(--space-12);
+  color: var(--empty-state-fg);
+}
+
+.empty-state__headline {
+  margin: 0;
+  font-size: var(--empty-state-headline-type);
+  font-weight: var(--font-weight-display);
+  line-height: var(--line-height-display);
+  letter-spacing: var(--letter-spacing-display);
+  color: var(--empty-state-fg);
+}
+
+.empty-state__subline {
+  margin: 0;
+  font-size: var(--empty-state-body-type);
+  font-weight: var(--font-weight-body);
+  line-height: var(--line-height-body);
+  color: var(--color-ink-secondary);
+}
+
+/* Minimal load-error fallback (polished ErrorBanner is Story 2.5). */
+.load-error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--error-banner-bg);
+  color: var(--error-banner-fg);
+  border: 1px solid var(--error-banner-border);
+  border-radius: var(--error-banner-radius);
+}
+
+.load-error__retry {
+  background: var(--button-primary-bg);
+  color: var(--button-primary-fg);
+  border: none;
+  border-radius: var(--button-primary-radius);
+  padding: var(--button-primary-padding);
+  cursor: pointer;
+}
+
+.load-error__retry:hover {
+  background: var(--button-primary-bg-hover);
+}

@@ -1,0 +1,9 @@
+# Keep the build context lean; build artifacts and local files are not needed in the image.
+node_modules
+dist
+coverage
+.env*
+*.local
+.git
+playwright-report
+test-results

@@ -1,0 +1,12 @@
+# Keep the build context lean and never bake secrets or test artifacts into the image.
+node_modules
+dist
+coverage
+.env
+.env.test
+*.local
+.git
+**/*.test.ts
+src/__tests__
+vitest.config.ts
+eslint.config.mjs

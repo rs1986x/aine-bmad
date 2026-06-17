@@ -5,6 +5,21 @@ A full-stack Todo application (React + Express + Postgres).
 This is a minimal placeholder. Full setup, architecture, and usage
 documentation are delivered in Story 4.1 (D-6).
 
+## Run the full stack
+
+With Docker installed, bring up the whole stack (db → backend → frontend) with a
+single command from the repo root:
+
+```bash
+docker compose up --build
+```
+
+Then open <http://localhost:8080> in a browser. nginx serves the app and
+reverse-proxies `/api/*` to the backend, so everything is one origin.
+
+Stop the stack with `docker compose down`. To also wipe the database volume
+(`db-data`), use `docker compose down -v`.
+
 ## Running the backend integration tests locally
 
 The backend integration tests (`backend/src/__tests__/todo.api.test.ts`) run

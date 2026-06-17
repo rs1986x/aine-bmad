@@ -17,3 +17,14 @@
 - Env validation is non-empty only — `DATABASE_URL`/`CORS_ORIGIN` use `z.string().min(1)`; a malformed connection string or origin passes the fail-fast check and fails later at connect/CORS time. Stricter format checks risk rejecting valid configs, so deferred to a hardening pass. [backend/src/config/env.ts]
 - Health route swallows the underlying DB error without logging — a real DB outage leaves no server-side diagnostic trail. Intentional quiet probe today; revisit for observability (rate-limited log). [backend/src/routes/health.routes.ts]
 - `env.ts` validates `process.env` at module load (`export const env = parseEnv(process.env)`), so importing the pure helpers in `env.test.ts` triggers validation and can fail at import time if the ambient env is invalid. Works in CI and with local `.env.test`; refactor (lazy singleton / split pure module) deferred as the approach is not clear-cut. [backend/src/config/env.ts]
+
+## Deferred from: code review of 1-3-one-command-docker-compose-bring-up (2026-06-17)
+
+- nginx resolves the `backend` upstream once at config load with no `resolver` directive, so if the backend container is recreated with a new compose-network IP, nginx keeps proxying to the stale address (persistent 502) until reloaded. Out of this story's AC scope (AC3 restarts only `db`; the backend stays up) and the spec explicitly chose the literal `proxy_pass http://backend:8080;` over the variable+`resolver` pattern. Revisit if/when backend recreation becomes a real scenario. [frontend/nginx.conf]
+
+## Deferred from: code review of 1-4-frontend-skeleton-tokens-shell-usetodos-loading-and-empty-states (2026-06-17)
+
+- No `AbortController`/timeout in `useTodos` — only an `ignore` flag suppresses post-unmount state writes; the underlying fetch is never cancelled and there is no timeout, so a hung/never-settling request leaves `loading=true` (the skeleton) indefinitely. Full error/retry UX is Story 2.5; revisit then. [frontend/src/hooks/useTodos.ts]
+- `reload()` does not clear the stale `list` — it resets `loading`/`error` but leaves the previously loaded todos in state, so a reload that fails after a prior success keeps stale data. Masked today because `App` renders the error branch ahead of the list; latent for future consumers (Story 2.1 `TodoList`). [frontend/src/hooks/useTodos.ts]
+- LoadingSkeleton row height is a hard-coded `56px` literal rather than a token-derived value (AC #2 prefers tokens over literals). Minor — no DESIGN.md token defines a skeleton/todo-row height, so there is no canonical token to reference; tidy up if a row-height token is introduced. [frontend/src/styles/app.css]
+- EmptyState `<h1>` is the document's only top-level heading and appears/disappears with data state, leaving no stable heading in the outline across loading/error/empty/populated. Minor a11y; the shell has no persistent app-title heading yet (Epic 2). [frontend/src/components/EmptyState.tsx]
