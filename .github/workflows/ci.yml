@@ -4,10 +4,11 @@ on:
   push:
   pull_request:
 
-# Avoid duplicate/Redundant runs: cancel in-progress runs for the same ref
-# (a branch push that also has an open PR would otherwise run twice).
+# Avoid duplicate/redundant runs: collapse a branch push and its open PR into
+# one concurrency group. PR events expose `github.head_ref` (the source branch);
+# push events fall back to `github.ref`, so both map to the same group key.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
 # Node 24 LTS — current LTS, comfortably above the toolchain's minimums
