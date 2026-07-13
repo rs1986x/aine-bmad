@@ -1,5 +1,6 @@
 import { EmptyState } from './components/EmptyState'
 import { LoadingSkeleton } from './components/LoadingSkeleton'
+import { TodoList } from './components/TodoList'
 import { useTodos } from './hooks/useTodos'
 
 function App() {
@@ -21,9 +22,7 @@ function App() {
       ) : list.length === 0 ? (
         <EmptyState />
       ) : (
-        // A populated list cannot happen against a fresh DB in Epic 1; the real
-        // TodoList is Story 2.1. Render a minimal placeholder — do not crash.
-        <p>{list.length} todos</p>
+        <TodoList todos={list} />
       )}
     </main>
   )

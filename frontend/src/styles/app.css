@@ -126,3 +126,125 @@ select {
 .load-error__retry:hover {
   background: var(--button-primary-bg-hover);
 }
+
+/* --- Story 2.1: populated Todo list (display-only) --- */
+
+/* TodoList — a single semantic <ul>, vertically stacked. */
+.todo-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* TodoItem — the todo-row visual: checkbox / description / meta / actions. */
+.todo-item {
+  display: flex;
+  align-items: center;
+  gap: var(--todo-row-gap);
+  background: var(--todo-row-bg);
+  border: 1px solid var(--todo-row-border);
+  border-radius: var(--todo-row-radius);
+  padding: var(--todo-row-padding);
+}
+
+/* Checkbox — styled native control, 22px visual box; the check glyph is a
+   background SVG (input elements don't reliably support ::after). Display-only
+   in this story (readOnly, no handler). The ≥44px interactive hit area is
+   deferred to Story 2.3 — when the checkbox becomes interactive it can carry a
+   real sized target (e.g. a wrapping <label>); a pseudo-element on a replaced
+   <input> is not a reliable way to enlarge the target. See deferred-work.md. */
+.todo-item__checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: 0 0 auto;
+  width: var(--checkbox-size);
+  height: var(--checkbox-size);
+  margin: 0;
+  border: 2px solid var(--checkbox-border);
+  border-radius: var(--checkbox-radius);
+  background: var(--color-surface-raised);
+  cursor: default;
+}
+
+.todo-item__checkbox:checked {
+  border-color: var(--checkbox-bg-checked);
+  background-color: var(--checkbox-bg-checked);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 70% 70%;
+}
+
+/* Description — flex-grow so meta/actions sit right. */
+.todo-item__desc {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--color-ink-primary);
+  overflow-wrap: anywhere;
+}
+
+.todo-item__desc--completed {
+  text-decoration: line-through;
+  color: var(--color-ink-muted);
+}
+
+/* created_at meta — meta type ramp. */
+.todo-item__meta {
+  flex: 0 0 auto;
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-meta);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-secondary);
+  white-space: nowrap;
+}
+
+/* Icon buttons — icon-button tokens; transparent, ≥44px hit area. */
+.todo-item__actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  /* Hidden-but-focusable by default (≥ md); revealed on hover/focus-within.
+     opacity (not display/visibility) keeps them in the tab order / a11y tree. */
+  opacity: 0;
+  transition: opacity 120ms ease-in-out;
+}
+
+.todo-item:hover .todo-item__actions,
+.todo-item:focus-within .todo-item__actions {
+  opacity: 1;
+}
+
+.todo-item__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: calc((44px - var(--icon-button-size)) / 2);
+  border: none;
+  border-radius: var(--icon-button-radius);
+  background: transparent;
+  color: var(--icon-button-fg);
+  cursor: pointer;
+}
+
+.todo-item__action:hover {
+  color: var(--icon-button-fg-hover);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .todo-item__actions {
+    transition: none;
+  }
+}
+
+/* Touch / below the single breakpoint: actions are always visible. */
+@media (max-width: 640px) {
+  .todo-item__actions {
+    opacity: 1;
+  }
+}
