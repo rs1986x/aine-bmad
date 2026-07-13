@@ -31,14 +31,34 @@ describe('App loading → empty transition', () => {
     expect(await screen.findByText('No todos yet.')).toBeInTheDocument()
     expect(screen.getByText('Add your first one above.')).toBeInTheDocument()
     await waitFor(() => expect(screen.queryByTestId('loading-skeleton')).not.toBeInTheDocument())
+
+    // The add input is present in the empty state (pinned above the CTA copy).
+    expect(screen.getByPlaceholderText('Add a todo…')).toBeInTheDocument()
   })
 
-  it('renders the minimal load-error fallback on failure', async () => {
+  it('does not render the add input during loading', async () => {
+    let resolveTodos: (todos: never[]) => void = () => {}
+    const pending = new Promise<never[]>((resolve) => {
+      resolveTodos = resolve
+    })
+    vi.spyOn(api, 'getTodos').mockReturnValue(pending)
+
+    render(<App />)
+
+    expect(screen.getByTestId('loading-skeleton')).toBeInTheDocument()
+    expect(screen.queryByPlaceholderText('Add a todo…')).not.toBeInTheDocument()
+
+    resolveTodos([])
+    expect(await screen.findByPlaceholderText('Add a todo…')).toBeInTheDocument()
+  })
+
+  it('renders the minimal load-error fallback on failure (no add input)', async () => {
     vi.spyOn(api, 'getTodos').mockRejectedValue(new api.ApiError('internal', 'boom', 500))
 
     render(<App />)
 
     expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't load your todos.")
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
+    expect(screen.queryByPlaceholderText('Add a todo…')).not.toBeInTheDocument()
   })
 })

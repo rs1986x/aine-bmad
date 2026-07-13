@@ -127,6 +127,89 @@ select {
   background: var(--button-primary-bg-hover);
 }
 
+/* --- Story 2.2: Add-Todo form (pinned above the list) --- */
+
+/* Input + Add button on one row (they wrap only if forced narrow); the error
+   helper takes the full width on its own line beneath. */
+.add-todo-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+}
+
+/* Visually-hidden programmatic label (accessible name without visible text). */
+.add-todo-form__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.add-todo-form__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: var(--input-text-bg);
+  color: var(--input-text-fg);
+  border: 1px solid var(--input-text-border);
+  border-radius: var(--input-text-radius);
+  padding: var(--input-text-padding);
+}
+
+.add-todo-form__input::placeholder {
+  color: var(--color-ink-secondary);
+}
+
+.add-todo-form__input:focus {
+  border-color: var(--input-text-border-focus);
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.add-todo-form__input--error,
+.add-todo-form__input[aria-invalid='true'] {
+  border-color: var(--color-danger);
+}
+
+.add-todo-form__submit {
+  flex: 0 0 auto;
+  background: var(--button-primary-bg);
+  color: var(--button-primary-fg);
+  border: none;
+  border-radius: var(--button-primary-radius);
+  padding: var(--button-primary-padding);
+  cursor: pointer;
+}
+
+.add-todo-form__submit:hover {
+  background: var(--button-primary-bg-hover);
+}
+
+.add-todo-form__submit:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.add-todo-form__submit:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.add-todo-form__error {
+  flex: 1 0 100%;
+  margin: 0;
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-label);
+  line-height: var(--line-height-label);
+  color: var(--color-danger-text);
+}
+
 /* --- Story 2.1: populated Todo list (display-only) --- */
 
 /* TodoList — a single semantic <ul>, vertically stacked. */

@@ -1,4 +1,5 @@
 import { pool } from '../db/pool'
+import type { CreateTodoInput } from '../schemas/todo.schema'
 import type { Todo } from '../types/todo'
 
 // Raw DB row shape (snake_case). `pg` returns a JS Date for TIMESTAMPTZ.
@@ -26,5 +27,16 @@ export const todoRepository = {
       'SELECT id, description, completed, created_at FROM todos ORDER BY created_at DESC',
     )
     return rows.map(toTodo)
+  },
+
+  async create(input: CreateTodoInput): Promise<Todo> {
+    // Parameterized insert (never interpolate input). id/completed/created_at
+    // all default in the DB (gen_random_uuid(), false, now()).
+    const { rows } = await pool.query<TodoRow>(
+      `INSERT INTO todos (description) VALUES ($1)
+       RETURNING id, description, completed, created_at`,
+      [input.description],
+    )
+    return toTodo(rows[0])
   },
 }

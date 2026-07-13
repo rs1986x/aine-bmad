@@ -104,3 +104,67 @@ describe('GET /api/todos', () => {
     expect(typeof first.createdAt).toBe('string')
   })
 })
+
+describe('POST /api/todos', () => {
+  it('creates a todo and returns 201 with the camelCase Todo', async () => {
+    const res = await request(app).post('/api/todos').send({ description: 'Buy milk' })
+
+    expect(res.status).toBe(201)
+    expect(res.body).toHaveProperty('id')
+    expect(typeof res.body.id).toBe('string')
+    expect(res.body.description).toBe('Buy milk')
+    expect(res.body.completed).toBe(false)
+    expect(typeof res.body.createdAt).toBe('string')
+    expect(res.body).not.toHaveProperty('created_at')
+  })
+
+  it('trims the description server-side before persisting', async () => {
+    const res = await request(app).post('/api/todos').send({ description: '  Buy milk  ' })
+
+    expect(res.status).toBe(201)
+    expect(res.body.description).toBe('Buy milk')
+  })
+
+  it('persists the created todo (a follow-up GET includes it)', async () => {
+    await request(app).post('/api/todos').send({ description: 'Buy milk' })
+
+    const res = await request(app).get('/api/todos')
+
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveLength(1)
+    expect(res.body[0].description).toBe('Buy milk')
+    expect(res.body[0].completed).toBe(false)
+  })
+
+  it('rejects a whitespace-only description with 400 and persists nothing', async () => {
+    const res = await request(app).post('/api/todos').send({ description: '   ' })
+
+    expect(res.status).toBe(400)
+    expect(res.body.error.code).toBe('VALIDATION_ERROR')
+
+    const list = await request(app).get('/api/todos')
+    expect(list.body).toEqual([])
+  })
+
+  it('rejects a missing description with 400 and persists nothing', async () => {
+    const res = await request(app).post('/api/todos').send({})
+
+    expect(res.status).toBe(400)
+    expect(res.body.error.code).toBe('VALIDATION_ERROR')
+
+    const list = await request(app).get('/api/todos')
+    expect(list.body).toEqual([])
+  })
+
+  it('rejects a description longer than 500 characters with 400 and persists nothing', async () => {
+    const res = await request(app)
+      .post('/api/todos')
+      .send({ description: 'a'.repeat(501) })
+
+    expect(res.status).toBe(400)
+    expect(res.body.error.code).toBe('VALIDATION_ERROR')
+
+    const list = await request(app).get('/api/todos')
+    expect(list.body).toEqual([])
+  })
+})

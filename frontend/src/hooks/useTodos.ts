@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Todo } from '../types/todo'
-import { getTodos } from '../api/api'
+import { createTodo, getTodos } from '../api/api'
 
 export interface UseTodos {
   list: Todo[]
   loading: boolean
   error: Error | null
   reload: () => void
+  addTodo: (description: string) => Promise<Todo>
 }
 
 // Read path only. The server response is the only source of truth — no
@@ -16,6 +17,17 @@ export function useTodos(): UseTodos {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
   const [reloadToken, setReloadToken] = useState(0)
+
+  // Create path: commit the server-confirmed Todo to the list only on the 201
+  // (no optimistic insert), prepending immutably. On failure, re-throw so the
+  // form owns the error locally. CRITICAL: never touch the top-level `error`
+  // here — that drives App's load-error branch and would unmount AddTodoForm,
+  // destroying the user's typed text.
+  const addTodo = useCallback(async (description: string): Promise<Todo> => {
+    const created = await createTodo({ description })
+    setList((prev) => [created, ...prev])
+    return created
+  }, [])
 
   const reload = useCallback(() => {
     // Reset request state here (an event callback) rather than synchronously in
@@ -48,5 +60,5 @@ export function useTodos(): UseTodos {
     }
   }, [reloadToken])
 
-  return { list, loading, error, reload }
+  return { list, loading, error, reload, addTodo }
 }

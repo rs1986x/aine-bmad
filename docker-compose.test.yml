@@ -17,4 +17,7 @@ services:
       timeout: 5s
       retries: 10
     tmpfs:
-      - /var/lib/postgresql/data
+      # postgres:18+ stores data in a major-version subdirectory under
+      # /var/lib/postgresql, so the ephemeral mount must sit at that root (not
+      # /var/lib/postgresql/data, which the image rejects as an "unused mount").
+      - /var/lib/postgresql

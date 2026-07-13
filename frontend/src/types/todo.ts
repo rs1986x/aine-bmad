@@ -8,5 +8,10 @@ export interface Todo {
   createdAt: string // ISO-8601 UTC
 }
 
-// CreateTodoInput / UpdateTodoInput are Epic 2 (Stories 2.2 / 2.3) —
-// intentionally not defined here.
+// Mirrors the backend create-input shape (the frontend has no Zod). The server
+// is authoritative for trimming/length; this is just the request body type.
+export interface CreateTodoInput {
+  description: string
+}
+
+// UpdateTodoInput is Story 2.3 — intentionally not defined here.

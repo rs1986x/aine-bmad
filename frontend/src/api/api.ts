@@ -1,4 +1,4 @@
-import type { Todo } from '../types/todo'
+import type { CreateTodoInput, Todo } from '../types/todo'
 
 // Typed error raised from the backend's `{ error: { code, message } }` envelope.
 // User-facing copy comes from EXPERIENCE.md — never the raw `message` here.
@@ -51,4 +51,33 @@ export async function getTodos(): Promise<Todo[]> {
   return body as Todo[]
 }
 
-// createTodo / updateTodo / deleteTodo land in Epic 2 (Stories 2.2–2.4).
+export async function createTodo(input: CreateTodoInput): Promise<Todo> {
+  const response = await fetch(`${API_BASE}/todos`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  if (!response.ok) {
+    throw await toApiError(response)
+  }
+  const body: unknown = await response.json()
+  if (!isTodo(body)) {
+    throw new ApiError('malformed_response', 'Expected a Todo', response.status)
+  }
+  return body
+}
+
+// Light runtime shape check so a malformed 2xx body surfaces as a typed
+// ApiError instead of crashing downstream render (mirrors getTodos's guard).
+function isTodo(value: unknown): value is Todo {
+  if (typeof value !== 'object' || value === null) return false
+  const todo = value as Record<string, unknown>
+  return (
+    typeof todo.id === 'string' &&
+    typeof todo.description === 'string' &&
+    typeof todo.completed === 'boolean' &&
+    typeof todo.createdAt === 'string'
+  )
+}
+
+// updateTodo / deleteTodo land in Stories 2.3–2.4.

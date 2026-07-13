@@ -7,5 +7,5 @@ export interface Todo {
   createdAt: string // ISO-8601 UTC
 }
 
-// Reserved for Epic 2 — CreateTodoInput / UpdateTodoInput land alongside their
-// Zod schemas in Stories 2.2 / 2.3. Intentionally not defined here.
+// CreateTodoInput is defined (via z.infer) in schemas/todo.schema.ts — do not
+// duplicate it here. UpdateTodoInput lands alongside its Zod schema in Story 2.3.
