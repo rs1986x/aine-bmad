@@ -7,9 +7,7 @@ describe('Story 2.3 update styles', () => {
     expect(css).toMatch(
       /\.todo-item__checkbox-target\s*\{[^}]*min-width:\s*44px;[^}]*min-height:\s*44px;/s,
     )
-    expect(css).toMatch(
-      /\.todo-item__checkbox-target--disabled\s*\{[^}]*cursor:\s*not-allowed;/s,
-    )
+    expect(css).toMatch(/\.todo-item__checkbox-target--disabled\s*\{[^}]*cursor:\s*not-allowed;/s)
     expect(css).toMatch(/\.todo-item__checkbox-target--busy\s*\{[^}]*cursor:\s*wait;/s)
     expect(css).toMatch(/\.todo-item__checkbox:disabled\s*\{[^}]*cursor:\s*not-allowed;/s)
     expect(css).toMatch(/\.todo-item__checkbox\[aria-busy='true'\]\s*\{[^}]*cursor:\s*wait;/s)
@@ -35,7 +33,9 @@ describe('Story 2.3 update styles', () => {
   it('allows the editor and actions to wrap on narrow layouts', () => {
     expect(css).toMatch(/\.todo-item__edit\s*\{[^}]*min-width:\s*0;[^}]*flex-wrap:\s*wrap;/s)
     expect(css).toMatch(/\.todo-item__error\s*\{[^}]*flex:\s*1 1 100%;[^}]*min-width:\s*0;/s)
-    expect(css).toMatch(/@media \(max-width:\s*640px\)[\s\S]*\.todo-item\s*\{[^}]*flex-wrap:\s*wrap;/)
+    expect(css).toMatch(
+      /@media \(max-width:\s*640px\)[\s\S]*\.todo-item\s*\{[^}]*flex-wrap:\s*wrap;/,
+    )
   })
 })
 
@@ -44,8 +44,9 @@ describe('Story 2.4 delete dialog styles', () => {
     expect(css).toMatch(
       /\.delete-dialog__scrim\s*\{[^}]*background:\s*color-mix\(in srgb, var\(--color-ink-primary\)[^;]*;/s,
     )
+    expect(css).toMatch(/\.delete-dialog\s*\{[^}]*background:\s*var\(--color-surface-raised\);/s)
     expect(css).toMatch(
-      /\.delete-dialog\s*\{[^}]*background:\s*var\(--color-surface-raised\);/s,
+      /\.delete-dialog\s*\{[^}]*box-shadow:[^;]*color-mix\(in srgb, var\(--color-ink-primary\) 20%, transparent\);/s,
     )
     expect(css).toContain('background: var(--button-danger-bg);')
     expect(css).toContain('background: var(--button-secondary-bg);')

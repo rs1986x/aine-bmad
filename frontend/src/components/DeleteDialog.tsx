@@ -46,6 +46,10 @@ export function DeleteDialog({ todo, onCancel, onConfirm }: DeleteDialogProps) {
     if (pending) dialogRef.current?.focus()
   }, [pending])
 
+  useEffect(() => {
+    if (!pending && error) confirmRef.current?.focus()
+  }, [error, pending])
+
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'Escape') {
       event.preventDefault()

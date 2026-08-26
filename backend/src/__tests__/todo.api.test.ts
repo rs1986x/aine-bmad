@@ -346,4 +346,19 @@ describe('DELETE /api/todos/:id', () => {
     const list = await request(app).get('/api/todos')
     expect(list.body).toEqual([existing.body])
   })
+
+  it('returns a generic 500 and preserves data when the delete query fails', async () => {
+    const existing = await request(app).post('/api/todos').send({ description: 'Keep me' })
+    const query = vi.spyOn(pool, 'query').mockRejectedValueOnce(new Error('database unavailable'))
+
+    const res = await request(app).delete(`/api/todos/${existing.body.id}`)
+    query.mockRestore()
+
+    expect(res.status).toBe(500)
+    expect(res.body).toEqual({
+      error: { code: 'INTERNAL', message: 'Something went wrong.' },
+    })
+    const list = await request(app).get('/api/todos')
+    expect(list.body).toEqual([existing.body])
+  })
 })

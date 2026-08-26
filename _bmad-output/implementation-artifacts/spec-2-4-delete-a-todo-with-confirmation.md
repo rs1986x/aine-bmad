@@ -61,6 +61,16 @@ context: []
 - [x] `frontend/src/components/TodoItem.tsx`, `frontend/src/components/TodoItem.test.tsx`, `frontend/src/components/TodoList.tsx`, `frontend/src/components/TodoList.test.tsx`, `frontend/src/App.tsx`, and `frontend/src/App.test.tsx` -- wire one-dialog ownership, mutation exclusion, confirmed removal, cancellation, post-close focus, and last-item empty state.
 - [x] `frontend/src/styles/app.css` and `frontend/src/styles/app.test.ts` -- implement responsive token-based dialog/focus/busy styling without new literal colors.
 
+### Review Findings
+
+- [x] [Review][Patch] Return focus to an enabled dialog action after a failed deletion [frontend/src/components/DeleteDialog.tsx:76]
+- [x] [Review][Patch] Add the specified soft overlay shadow to the delete dialog [frontend/src/styles/app.css:477]
+- [x] [Review][Patch] Derive post-delete focus from the latest rendered list and enabled controls [frontend/src/components/TodoList.tsx:73]
+- [x] [Review][Patch] Cover the real multi-item pending-to-success deletion transition in an integration test [frontend/src/components/TodoList.test.tsx:265]
+- [x] [Review][Patch] Verify that a native DELETE fetch rejection propagates [frontend/src/api/api.test.ts:72]
+- [x] [Review][Patch] Verify DELETE query failures return the generic 500 envelope without removing data [backend/src/__tests__/todo.api.test.ts:309]
+- [x] [Review][Defer] Give each row Delete control a Todo-specific accessible name [frontend/src/components/TodoItem.tsx:206] — deferred, pre-existing
+
 **Acceptance Criteria:**
 - Given a populated list, when a user completes the confirmation flow, then exactly one server-confirmed Todo is permanently removed and remains absent after reload while siblings are unchanged.
 - Given the confirmation dialog, when operated by keyboard, then it has correct dialog naming/modal semantics, starts on Cancel, cycles focus internally, dismisses on Escape, and moves focus sensibly after either cancellation or confirmed removal.

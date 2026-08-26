@@ -483,6 +483,8 @@ select {
   color: var(--color-ink-primary);
   border: 1px solid var(--color-border-hairline);
   border-radius: var(--radius-lg);
+  box-shadow: 0 var(--space-2) var(--space-6)
+    color-mix(in srgb, var(--color-ink-primary) 20%, transparent);
 }
 
 .delete-dialog__title {

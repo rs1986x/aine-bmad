@@ -135,6 +135,7 @@ describe('DeleteDialog', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't save that change.")
     expect(screen.getByRole('dialog')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Delete' })).not.toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Delete' })).toHaveFocus()
 
     await user.click(screen.getByRole('button', { name: 'Delete' }))
     expect(onConfirm).toHaveBeenCalledTimes(2)

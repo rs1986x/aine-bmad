@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import type { Todo } from '../types/todo'
@@ -112,6 +112,37 @@ describe('AddTodoForm', () => {
     expect(onAdd).toHaveBeenCalledTimes(1)
 
     resolve(aTodo)
+  })
+
+  it('honors a queued focus request after an in-flight Add re-enables the input', async () => {
+    const user = userEvent.setup()
+    let rejectAdd: (error: Error) => void = () => {}
+    const pending = new Promise<Todo>((_resolve, reject) => {
+      rejectAdd = reject
+    })
+    const onAdd = vi.fn().mockReturnValue(pending)
+    const { rerender } = render(
+      <>
+        <button type="button">Outside</button>
+        <AddTodoForm onAdd={onAdd} focusRequest={0} />
+      </>,
+    )
+    const input = screen.getByRole('textbox', { name: /add a todo/i })
+    await user.type(input, 'Buy milk')
+    await user.keyboard('{Enter}')
+    screen.getByRole('button', { name: 'Outside' }).focus()
+
+    rerender(
+      <>
+        <button type="button">Outside</button>
+        <AddTodoForm onAdd={onAdd} focusRequest={1} />
+      </>,
+    )
+    expect(input).toBeDisabled()
+
+    rejectAdd(new Error('boom'))
+    expect(await screen.findByText("Couldn't save that change.")).toBeInTheDocument()
+    await waitFor(() => expect(input).toHaveFocus())
   })
 
   it('clears the empty-validation error once the user types', async () => {

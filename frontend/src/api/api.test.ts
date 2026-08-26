@@ -23,7 +23,9 @@ describe('updateTodo', () => {
     )
     vi.stubGlobal('fetch', fetchMock)
 
-    await expect(updateTodo('todo/id with space', { completed: true })).resolves.toEqual(updatedTodo)
+    await expect(updateTodo('todo/id with space', { completed: true })).resolves.toEqual(
+      updatedTodo,
+    )
     expect(fetchMock).toHaveBeenCalledWith('/api/todos/todo%2Fid%20with%20space', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -90,13 +92,10 @@ describe('deleteTodo', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
-        new Response(
-          JSON.stringify({ error: { code: 'NOT_FOUND', message: 'Todo not found' } }),
-          {
-            status: 404,
-            headers: { 'Content-Type': 'application/json' },
-          },
-        ),
+        new Response(JSON.stringify({ error: { code: 'NOT_FOUND', message: 'Todo not found' } }), {
+          status: 404,
+          headers: { 'Content-Type': 'application/json' },
+        }),
       ),
     )
 
@@ -111,5 +110,12 @@ describe('deleteTodo', () => {
     await expect(deleteTodo(updatedTodo.id)).rejects.toEqual(
       new ApiError('malformed_response', 'Expected 204 No Content', 200),
     )
+  })
+
+  it('propagates a native fetch rejection without confirming removal', async () => {
+    const networkError = new TypeError('Failed to fetch')
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(networkError))
+
+    await expect(deleteTodo(updatedTodo.id)).rejects.toBe(networkError)
   })
 })

@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
@@ -25,13 +25,21 @@ function renderList(
       description,
     })),
   onDelete = vi.fn<(id: string) => Promise<void>>().mockResolvedValue(),
+  onFocusAdd = vi.fn(),
 ) {
   return {
     onToggle,
     onEdit,
     onDelete,
+    onFocusAdd,
     ...render(
-      <TodoList todos={list} onToggle={onToggle} onEdit={onEdit} onDelete={onDelete} />,
+      <TodoList
+        todos={list}
+        onToggle={onToggle}
+        onEdit={onEdit}
+        onDelete={onDelete}
+        onFocusAdd={onFocusAdd}
+      />,
     ),
   }
 }
@@ -180,12 +188,11 @@ describe('TodoList', () => {
         onToggle={onToggle}
         onEdit={vi.fn()}
         onDelete={vi.fn()}
+        onFocusAdd={vi.fn()}
       />,
     )
 
-    expect(
-      screen.getAllByRole('listitem').map((item) => item.getAttribute('aria-label')),
-    ).toEqual([
+    expect(screen.getAllByRole('listitem').map((item) => item.getAttribute('aria-label'))).toEqual([
       'active old',
       'Completed: completed new',
       'Completed: active new',
@@ -208,12 +215,11 @@ describe('TodoList', () => {
         onToggle={onToggle}
         onEdit={vi.fn()}
         onDelete={vi.fn()}
+        onFocusAdd={vi.fn()}
       />,
     )
 
-    expect(
-      screen.getAllByRole('listitem').map((item) => item.getAttribute('aria-label')),
-    ).toEqual([
+    expect(screen.getAllByRole('listitem').map((item) => item.getAttribute('aria-label'))).toEqual([
       'completed new',
       'active new',
       'active old',
@@ -269,7 +275,27 @@ describe('TodoList', () => {
       resolveDelete = resolve
     })
     const onDelete = vi.fn().mockReturnValue(pending)
-    renderList(todos, undefined, undefined, onDelete)
+
+    function StatefulList() {
+      const [list, setList] = useState(todos)
+      return (
+        <TodoList
+          todos={list}
+          onToggle={async (todo) => todo}
+          onEdit={async (id, description) => ({
+            ...list.find((todo) => todo.id === id)!,
+            description,
+          })}
+          onDelete={async (id) => {
+            await onDelete(id)
+            setList((current) => current.filter((todo) => todo.id !== id))
+          }}
+          onFocusAdd={vi.fn()}
+        />
+      )
+    }
+
+    render(<StatefulList />)
     const activeNew = screen.getByRole('listitem', { name: 'active new' })
     await user.click(within(activeNew).getByRole('button', { name: 'Delete todo' }))
     const confirm = screen.getByRole('button', { name: 'Delete' })
@@ -285,6 +311,8 @@ describe('TodoList', () => {
 
     resolveDelete()
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(activeNew).not.toBeInTheDocument()
+    expect(screen.getAllByRole('listitem')).toHaveLength(3)
     const neighboringDelete = within(
       screen.getByRole('listitem', { name: 'active old' }),
     ).getByRole('button', { name: 'Delete todo' })
@@ -305,6 +333,7 @@ describe('TodoList', () => {
             description,
           })}
           onDelete={async (id) => setList((current) => current.filter((todo) => todo.id !== id))}
+          onFocusAdd={vi.fn()}
         />
       )
     }
@@ -319,6 +348,101 @@ describe('TodoList', () => {
       screen.getByRole('listitem', { name: 'Completed: completed new' }),
     ).getByRole('button', { name: 'Delete todo' })
     await waitFor(() => expect(precedingDelete).toHaveFocus())
+  })
+
+  it('chooses post-response focus from Todos added while deletion is pending', async () => {
+    const user = userEvent.setup()
+    let resolveDelete: () => void = () => {}
+    const pending = new Promise<void>((resolve) => {
+      resolveDelete = resolve
+    })
+    let addTodo: () => void = () => {}
+    const onFocusAdd = vi.fn()
+    const target = todos[2]
+    const created: Todo = {
+      id: '5',
+      description: 'created while deleting',
+      completed: false,
+      createdAt: '2026-01-07T00:00:00.000Z',
+    }
+
+    function StatefulList() {
+      const [list, setList] = useState([target])
+      addTodo = () => setList((current) => [created, ...current])
+      return (
+        <TodoList
+          todos={list}
+          onToggle={async (todo) => todo}
+          onEdit={async (_id, description) => ({ ...target, description })}
+          onDelete={async (id) => {
+            await pending
+            setList((current) => current.filter((todo) => todo.id !== id))
+          }}
+          onFocusAdd={onFocusAdd}
+        />
+      )
+    }
+
+    render(<StatefulList />)
+    await user.click(screen.getByRole('button', { name: 'Delete todo' }))
+    await user.click(screen.getByRole('button', { name: 'Delete' }))
+    act(() => addTodo())
+    resolveDelete()
+
+    const createdRow = await screen.findByRole('listitem', { name: created.description })
+    const createdDelete = within(createdRow).getByRole('button', { name: 'Delete todo' })
+    await waitFor(() => expect(createdDelete).toHaveFocus())
+    expect(onFocusAdd).not.toHaveBeenCalled()
+  })
+
+  it('waits for the nearest remaining Delete control to become enabled', async () => {
+    const user = userEvent.setup()
+    let resolveToggle: (todo: Todo) => void = () => {}
+    const togglePending = new Promise<Todo>((resolve) => {
+      resolveToggle = resolve
+    })
+    const onFocusAdd = vi.fn()
+    const target = todos[2]
+    const sibling = todos[0]
+
+    function StatefulList() {
+      const [list, setList] = useState([target, sibling])
+      return (
+        <TodoList
+          todos={list}
+          onToggle={async (todo) => {
+            const updated = await togglePending
+            setList((current) => current.map((item) => (item.id === todo.id ? updated : item)))
+            return updated
+          }}
+          onEdit={async (_id, description) => ({ ...target, description })}
+          onDelete={async (id) => setList((current) => current.filter((todo) => todo.id !== id))}
+          onFocusAdd={onFocusAdd}
+        />
+      )
+    }
+
+    render(<StatefulList />)
+    const siblingRow = screen.getByRole('listitem', { name: sibling.description })
+    await user.click(within(siblingRow).getByRole('checkbox'))
+    expect(within(siblingRow).getByRole('button', { name: 'Delete todo' })).toBeDisabled()
+
+    const targetRow = screen.getByRole('listitem', { name: target.description })
+    await user.click(within(targetRow).getByRole('button', { name: 'Delete todo' }))
+    await user.click(screen.getByRole('button', { name: 'Delete' }))
+
+    expect(onFocusAdd).not.toHaveBeenCalled()
+    const siblingDelete = within(siblingRow).getByRole('button', { name: 'Delete todo' })
+    expect(siblingDelete).toBeDisabled()
+
+    resolveToggle({ ...sibling, completed: true })
+    await waitFor(() =>
+      expect(
+        within(
+          screen.getByRole('listitem', { name: `Completed: ${sibling.description}` }),
+        ).getByRole('button', { name: 'Delete todo' }),
+      ).toHaveFocus(),
+    )
   })
 
   it('keeps the dialog and Todo retryable after deletion fails', async () => {

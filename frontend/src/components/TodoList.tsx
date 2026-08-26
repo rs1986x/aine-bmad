@@ -10,6 +10,7 @@ interface TodoListProps {
   onToggle: (todo: Todo) => Promise<Todo>
   onEdit: (id: string, description: string) => Promise<Todo>
   onDelete: (id: string) => Promise<void>
+  onFocusAdd: () => void
 }
 
 interface DeleteTarget {
@@ -17,11 +18,12 @@ interface DeleteTarget {
   trigger: HTMLButtonElement
 }
 
-export function TodoList({ todos, onToggle, onEdit, onDelete }: TodoListProps) {
+export function TodoList({ todos, onToggle, onEdit, onDelete, onFocusAdd }: TodoListProps) {
   const [editingTodoId, setEditingTodoId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
   const listRef = useRef<HTMLUListElement>(null)
   const focusTimerRef = useRef<number | null>(null)
+  const focusObserverRef = useRef<MutationObserver | null>(null)
   const { active, completed } = groupTodos(todos)
   const orderedTodos = [...active, ...completed]
 
@@ -30,6 +32,7 @@ export function TodoList({ todos, onToggle, onEdit, onDelete }: TodoListProps) {
       if (focusTimerRef.current !== null) {
         window.clearTimeout(focusTimerRef.current)
       }
+      focusObserverRef.current?.disconnect()
     },
     [],
   )
@@ -38,6 +41,8 @@ export function TodoList({ todos, onToggle, onEdit, onDelete }: TodoListProps) {
     if (focusTimerRef.current !== null) {
       window.clearTimeout(focusTimerRef.current)
     }
+    focusObserverRef.current?.disconnect()
+    focusObserverRef.current = null
 
     focusTimerRef.current = window.setTimeout(() => {
       focusTimerRef.current = null
@@ -59,8 +64,68 @@ export function TodoList({ todos, onToggle, onEdit, onDelete }: TodoListProps) {
         }
       }
 
-      document.querySelector<HTMLInputElement>('.add-todo-form__input')?.focus()
+      onFocusAdd()
     }, 0)
+  }
+
+  const focusAfterDelete = (targetIndex: number, targetId: string) => {
+    if (focusTimerRef.current !== null) {
+      window.clearTimeout(focusTimerRef.current)
+      focusTimerRef.current = null
+    }
+    focusObserverRef.current?.disconnect()
+    focusObserverRef.current = null
+
+    const tryFocus = (): boolean => {
+      const deleteControls = Array.from(
+        listRef.current?.querySelectorAll<HTMLButtonElement>('[data-todo-delete-id]') ?? [],
+      )
+
+      if (deleteControls.some((button) => button.dataset.todoDeleteId === targetId)) {
+        return false
+      }
+
+      if (deleteControls.length === 0) {
+        onFocusAdd()
+        return true
+      }
+
+      const pivot = Math.min(Math.max(targetIndex, 0), deleteControls.length - 1)
+      for (let offset = 0; offset < deleteControls.length; offset += 1) {
+        const next = deleteControls[pivot + offset]
+        const previous = deleteControls[pivot - 1 - offset]
+        if (next && !next.disabled) {
+          next.focus()
+          return true
+        }
+        if (previous && !previous.disabled) {
+          previous.focus()
+          return true
+        }
+      }
+
+      return false
+    }
+
+    if (tryFocus()) return
+
+    const list = listRef.current
+    if (!list) {
+      onFocusAdd()
+      return
+    }
+
+    focusObserverRef.current = new MutationObserver(() => {
+      if (!tryFocus()) return
+      focusObserverRef.current?.disconnect()
+      focusObserverRef.current = null
+    })
+    focusObserverRef.current.observe(list, {
+      attributes: true,
+      attributeFilter: ['disabled'],
+      childList: true,
+      subtree: true,
+    })
   }
 
   const cancelDelete = () => {
@@ -72,25 +137,12 @@ export function TodoList({ todos, onToggle, onEdit, onDelete }: TodoListProps) {
 
   const confirmDelete = async () => {
     if (!deleteTarget) return
-    const targetIndex = orderedTodos.findIndex((todo) => todo.id === deleteTarget.todo.id)
-    const remaining = orderedTodos.filter((todo) => todo.id !== deleteTarget.todo.id)
-    const candidateIds: string[] = []
-    const pivot = Math.max(targetIndex, 0)
-    for (let offset = 0; offset < remaining.length; offset += 1) {
-      const next = remaining[pivot + offset]
-      const previous = remaining[pivot - 1 - offset]
-      if (next) candidateIds.push(next.id)
-      if (previous) candidateIds.push(previous.id)
-    }
+    const targetId = deleteTarget.todo.id
+    const targetIndex = orderedTodos.findIndex((todo) => todo.id === targetId)
 
-    await onDelete(deleteTarget.todo.id)
-    if (candidateIds.length === 0) {
-      flushSync(() => setDeleteTarget(null))
-      document.querySelector<HTMLInputElement>('.add-todo-form__input')?.focus()
-    } else {
-      setDeleteTarget(null)
-      focusAfterRender(candidateIds)
-    }
+    await onDelete(targetId)
+    flushSync(() => setDeleteTarget(null))
+    focusAfterDelete(targetIndex, targetId)
   }
 
   const renderTodo = (todo: Todo) => (
@@ -124,11 +176,7 @@ export function TodoList({ todos, onToggle, onEdit, onDelete }: TodoListProps) {
         {completed.map(renderTodo)}
       </ul>
       {deleteTarget ? (
-        <DeleteDialog
-          todo={deleteTarget.todo}
-          onCancel={cancelDelete}
-          onConfirm={confirmDelete}
-        />
+        <DeleteDialog todo={deleteTarget.todo} onCancel={cancelDelete} onConfirm={confirmDelete} />
       ) : null}
     </>
   )

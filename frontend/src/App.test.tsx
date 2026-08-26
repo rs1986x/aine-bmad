@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
@@ -100,9 +100,7 @@ describe('App loading → empty transition', () => {
     render(<App />)
     const item = await screen.findByRole('listitem', { name: 'Delete through App' })
 
-    await user.click(
-      item.querySelector<HTMLButtonElement>('button[aria-label="Delete todo"]')!,
-    )
+    await user.click(item.querySelector<HTMLButtonElement>('button[aria-label="Delete todo"]')!)
     expect(item).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Delete' }))
 
@@ -110,5 +108,44 @@ describe('App loading → empty transition', () => {
     expect(await screen.findByText('No todos yet.')).toBeInTheDocument()
     expect(screen.queryByRole('listitem')).not.toBeInTheDocument()
     await waitFor(() => expect(screen.getByPlaceholderText('Add a todo…')).toHaveFocus())
+  })
+
+  it('keeps a Todo rendered while DELETE is pending, then removes only that Todo', async () => {
+    const user = userEvent.setup()
+    const target: Todo = {
+      id: '00000000-0000-4000-8000-000000000000',
+      description: 'Delete through App',
+      completed: false,
+      createdAt: '2026-08-26T08:00:00.000Z',
+    }
+    const sibling: Todo = {
+      id: '00000000-0000-4000-8000-000000000001',
+      description: 'Keep through App',
+      completed: false,
+      createdAt: '2026-08-25T08:00:00.000Z',
+    }
+    let resolveDelete: () => void = () => {}
+    const pendingDelete = new Promise<void>((resolve) => {
+      resolveDelete = resolve
+    })
+    vi.spyOn(api, 'getTodos').mockResolvedValue([target, sibling])
+    const remove = vi.spyOn(api, 'deleteTodo').mockReturnValue(pendingDelete)
+    render(<App />)
+    const targetRow = await screen.findByRole('listitem', { name: target.description })
+
+    await user.click(within(targetRow).getByRole('button', { name: 'Delete todo' }))
+    await user.click(screen.getByRole('button', { name: 'Delete' }))
+
+    expect(remove).toHaveBeenCalledWith(target.id)
+    expect(targetRow).toBeInTheDocument()
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+    resolveDelete()
+    await waitFor(() => expect(targetRow).not.toBeInTheDocument())
+    const siblingRow = screen.getByRole('listitem', { name: sibling.description })
+    expect(siblingRow).toBeInTheDocument()
+    await waitFor(() =>
+      expect(within(siblingRow).getByRole('button', { name: 'Delete todo' })).toHaveFocus(),
+    )
   })
 })

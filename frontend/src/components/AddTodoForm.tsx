@@ -4,12 +4,19 @@ import { useEffect, useId, useRef, useState } from 'react'
 // busy flag, and an inline message). It never calls the API directly — the
 // parent passes `onAdd` (wired to useTodos.addTodo). Confirm-on-response: the
 // list only updates when `onAdd` resolves; on rejection the typed text is kept.
-export function AddTodoForm({ onAdd }: { onAdd: (description: string) => Promise<unknown> }) {
+export function AddTodoForm({
+  onAdd,
+  focusRequest = 0,
+}: {
+  onAdd: (description: string) => Promise<unknown>
+  focusRequest?: number
+}) {
   const [value, setValue] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const shouldRefocus = useRef(false)
+  const handledFocusRequest = useRef(focusRequest)
   const inputId = useId()
   const errorId = useId()
 
@@ -24,6 +31,12 @@ export function AddTodoForm({ onAdd }: { onAdd: (description: string) => Promise
       inputRef.current?.focus()
     }
   }, [submitting])
+
+  useEffect(() => {
+    if (focusRequest === handledFocusRequest.current || submitting) return
+    handledFocusRequest.current = focusRequest
+    inputRef.current?.focus()
+  }, [focusRequest, submitting])
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()

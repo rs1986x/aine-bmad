@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { AddTodoForm } from './components/AddTodoForm'
 import { EmptyState } from './components/EmptyState'
 import { LoadingSkeleton } from './components/LoadingSkeleton'
@@ -6,6 +7,7 @@ import { useTodos } from './hooks/useTodos'
 
 function App() {
   const { list, loading, error, reload, addTodo, toggleTodo, editTodo, removeTodo } = useTodos()
+  const [addFocusRequest, setAddFocusRequest] = useState(0)
 
   return (
     <main className="app-shell" aria-busy={loading}>
@@ -23,7 +25,7 @@ function App() {
         </div>
       ) : (
         <>
-          <AddTodoForm onAdd={addTodo} />
+          <AddTodoForm onAdd={addTodo} focusRequest={addFocusRequest} />
           {list.length === 0 ? (
             <EmptyState />
           ) : (
@@ -32,6 +34,7 @@ function App() {
               onToggle={toggleTodo}
               onEdit={editTodo}
               onDelete={removeTodo}
+              onFocusAdd={() => setAddFocusRequest((request) => request + 1)}
             />
           )}
         </>
