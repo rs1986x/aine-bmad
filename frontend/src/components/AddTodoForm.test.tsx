@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import type { Todo } from '../types/todo'
@@ -76,19 +76,53 @@ describe('AddTodoForm', () => {
     expect(document.getElementById(describedBy)).toHaveTextContent('Enter some text first.')
   })
 
-  it('preserves the text and re-enables controls with an inline message on a failed create', async () => {
+  it('preserves text and registers the original create transaction for global Retry', async () => {
     const user = userEvent.setup()
-    const onAdd = vi.fn().mockRejectedValue(new Error('boom'))
-    render(<AddTodoForm onAdd={onAdd} />)
+    const failure = new Error('boom')
+    const onAdd = vi.fn().mockRejectedValueOnce(failure).mockResolvedValueOnce(aTodo)
+    const onFailure = vi.fn()
+    render(<AddTodoForm onAdd={onAdd} onFailure={onFailure} />)
 
     const input = screen.getByRole('textbox', { name: /add a todo/i })
     await user.type(input, 'Buy milk')
     await user.keyboard('{Enter}')
 
-    expect(await screen.findByText("Couldn't save that change.")).toBeInTheDocument()
+    await waitFor(() =>
+      expect(onFailure).toHaveBeenCalledWith(expect.anything(), failure, expect.any(Function)),
+    )
     expect(input).toHaveValue('Buy milk')
     expect(input).not.toBeDisabled()
     expect(screen.getByRole('button', { name: 'Add' })).not.toBeDisabled()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+
+    const retry = onFailure.mock.calls[0][2] as () => Promise<void>
+    await act(() => retry())
+    expect(onAdd).toHaveBeenCalledTimes(2)
+    expect(onAdd).toHaveBeenLastCalledWith('Buy milk')
+    expect(input).toHaveValue('')
+  })
+
+  it('clears a stale create retry when the preserved draft changes', async () => {
+    const user = userEvent.setup()
+    const onFailure = vi.fn()
+    const onClearFailure = vi.fn()
+    render(
+      <AddTodoForm
+        onAdd={vi.fn().mockRejectedValue(new Error('boom'))}
+        onFailure={onFailure}
+        onClearFailure={onClearFailure}
+      />,
+    )
+    const input = screen.getByRole('textbox', { name: /add a todo/i })
+    await user.type(input, 'Original')
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(onFailure).toHaveBeenCalled())
+    onClearFailure.mockClear()
+
+    await user.type(input, ' changed')
+
+    expect(onClearFailure).toHaveBeenCalled()
+    expect(input).toHaveValue('Original changed')
   })
 
   it('disables controls while in flight and guards against double-submit', async () => {
@@ -141,7 +175,7 @@ describe('AddTodoForm', () => {
     expect(input).toBeDisabled()
 
     rejectAdd(new Error('boom'))
-    expect(await screen.findByText("Couldn't save that change.")).toBeInTheDocument()
+    await waitFor(() => expect(input).not.toBeDisabled())
     await waitFor(() => expect(input).toHaveFocus())
   })
 

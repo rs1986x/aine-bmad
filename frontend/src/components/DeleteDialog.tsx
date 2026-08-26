@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
+import { isConnectionError } from '../api/api'
 import type { Todo } from '../types/todo'
 
 interface DeleteDialogProps {
@@ -83,8 +84,12 @@ export function DeleteDialog({ todo, onCancel, onConfirm }: DeleteDialogProps) {
     setPending(true)
     try {
       await onConfirm()
-    } catch {
-      setError("Couldn't save that change.")
+    } catch (failure) {
+      setError(
+        isConnectionError(failure)
+          ? "Couldn't connect. Check your connection and retry."
+          : "Couldn't save that change. Retry.",
+      )
     } finally {
       setPending(false)
     }

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ComponentProps } from 'react'
 import { describe, expect, it, vi } from 'vitest'
@@ -162,23 +162,29 @@ describe('TodoItem', () => {
     expect(screen.getByText('Walk the dog')).not.toHaveClass('todo-item__desc--completed')
   })
 
-  it('keeps the checked state on toggle failure and clears local feedback on retry', async () => {
+  it('keeps the checked state and registers the original toggle for global Retry', async () => {
     const user = userEvent.setup()
+    const failure = new Error('failed')
     const onToggle = vi
       .fn()
-      .mockRejectedValueOnce(new Error('failed'))
+      .mockRejectedValueOnce(failure)
       .mockResolvedValueOnce({ ...activeTodo, completed: true })
-    renderItem(activeTodo, { onToggle })
+    const onFailure = vi.fn()
+    renderItem(activeTodo, { onToggle, onFailure })
     const checkbox = screen.getByRole('checkbox')
 
     await user.click(checkbox)
-    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't save that change.")
+    await waitFor(() =>
+      expect(onFailure).toHaveBeenCalledWith(expect.anything(), failure, expect.any(Function)),
+    )
     expect(checkbox).not.toBeChecked()
     expect(checkbox).not.toBeDisabled()
-
-    await user.click(checkbox)
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+
+    const retry = onFailure.mock.calls[0][2] as () => Promise<void>
+    await act(() => retry())
     expect(onToggle).toHaveBeenCalledTimes(2)
+    expect(onToggle).toHaveBeenLastCalledWith(activeTodo)
   })
 
   it('supports Enter activation and uses a semantic checkbox target wrapper', async () => {
@@ -256,7 +262,8 @@ describe('TodoItem', () => {
     const user = userEvent.setup()
     const onCancelEdit = vi.fn()
     const onSaveEdit = vi.fn()
-    renderItem(activeTodo, { isEditing: true, onCancelEdit, onSaveEdit })
+    const onClearFailure = vi.fn()
+    renderItem(activeTodo, { isEditing: true, onCancelEdit, onSaveEdit, onClearFailure })
 
     if (action === 'Cancel') {
       await user.click(screen.getByRole('button', { name: 'Cancel' }))
@@ -265,6 +272,7 @@ describe('TodoItem', () => {
     }
 
     expect(onCancelEdit).toHaveBeenCalledOnce()
+    expect(onClearFailure).toHaveBeenCalledOnce()
     expect(onSaveEdit).not.toHaveBeenCalled()
   })
 
@@ -284,21 +292,31 @@ describe('TodoItem', () => {
     expect(onSaveEdit).not.toHaveBeenCalled()
   })
 
-  it('preserves the typed draft and edit mode after a failed save, then clears feedback on typing', async () => {
+  it('preserves the typed draft and registers the original edit for global Retry', async () => {
     const user = userEvent.setup()
-    const onSaveEdit = vi.fn().mockRejectedValue(new Error('failed'))
-    renderItem(activeTodo, { isEditing: true, onSaveEdit })
+    const failure = new Error('failed')
+    const onSaveEdit = vi.fn().mockRejectedValueOnce(failure).mockResolvedValueOnce(activeTodo)
+    const onFailure = vi.fn()
+    const onClearFailure = vi.fn()
+    renderItem(activeTodo, { isEditing: true, onSaveEdit, onFailure, onClearFailure })
     const input = screen.getByRole('textbox')
     await user.clear(input)
     await user.type(input, 'keep this draft')
     await user.click(screen.getByRole('button', { name: 'Save' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't save that change.")
+    await waitFor(() =>
+      expect(onFailure).toHaveBeenCalledWith(expect.anything(), failure, expect.any(Function)),
+    )
     expect(input).toHaveValue('keep this draft')
     expect(input).not.toBeDisabled()
     expect(screen.getByRole('listitem')).toHaveClass('todo-item--editing')
+    onClearFailure.mockClear()
+
+    const retry = onFailure.mock.calls[0][2] as () => Promise<void>
+    await act(() => retry())
+    expect(onSaveEdit).toHaveBeenLastCalledWith('keep this draft')
 
     await user.type(input, '!')
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(onClearFailure).toHaveBeenCalledOnce()
   })
 })

@@ -1,31 +1,58 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AddTodoForm } from './components/AddTodoForm'
 import { EmptyState } from './components/EmptyState'
+import { ErrorBanner } from './components/ErrorBanner'
 import { LoadingSkeleton } from './components/LoadingSkeleton'
 import { TodoList } from './components/TodoList'
 import { useTodos } from './hooks/useTodos'
 
 function App() {
-  const { list, loading, error, reload, addTodo, toggleTodo, editTodo, removeTodo } = useTodos()
+  const {
+    list,
+    loading,
+    loadFailed,
+    errorId,
+    errorMessage,
+    retrying,
+    announcement,
+    announcementId,
+    dismissAnnouncement,
+    retry,
+    registerFailure,
+    clearFailure,
+    addTodo,
+    toggleTodo,
+    editTodo,
+    removeTodo,
+  } = useTodos()
   const [addFocusRequest, setAddFocusRequest] = useState(0)
 
+  useEffect(() => {
+    if (!announcement) return
+    const timer = window.setTimeout(dismissAnnouncement, 1_000)
+    return () => window.clearTimeout(timer)
+  }, [announcement, announcementId, dismissAnnouncement])
+
   return (
-    <main className="app-shell" aria-busy={loading}>
-      {loading ? (
+    <main className="app-shell" aria-busy={loading || retrying}>
+      {loadFailed && errorMessage ? (
+        <>
+          <ErrorBanner key={errorId} message={errorMessage} retrying={retrying} onRetry={retry} />
+          {loading ? <LoadingSkeleton /> : null}
+        </>
+      ) : loading ? (
         <LoadingSkeleton />
-      ) : error ? (
-        // Minimal fallback so an early load failure isn't a blank screen. The
-        // polished ErrorBanner + full retry UX is Story 2.5. The add form is
-        // intentionally absent here (and during loading).
-        <div className="load-error" role="alert">
-          <span>Couldn't load your todos.</span>
-          <button type="button" className="load-error__retry" onClick={reload}>
-            Retry
-          </button>
-        </div>
       ) : (
         <>
-          <AddTodoForm onAdd={addTodo} focusRequest={addFocusRequest} />
+          <AddTodoForm
+            onAdd={addTodo}
+            onFailure={registerFailure}
+            onClearFailure={clearFailure}
+            focusRequest={addFocusRequest}
+          />
+          {errorMessage ? (
+            <ErrorBanner key={errorId} message={errorMessage} retrying={retrying} onRetry={retry} />
+          ) : null}
           {list.length === 0 ? (
             <EmptyState />
           ) : (
@@ -34,11 +61,16 @@ function App() {
               onToggle={toggleTodo}
               onEdit={editTodo}
               onDelete={removeTodo}
+              onFailure={registerFailure}
+              onClearFailure={clearFailure}
               onFocusAdd={() => setAddFocusRequest((request) => request + 1)}
             />
           )}
         </>
       )}
+      <p className="sr-only" aria-live="polite" aria-atomic="true">
+        <span key={announcementId}>{announcement}</span>
+      </p>
     </main>
   )
 }

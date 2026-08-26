@@ -101,20 +101,22 @@ select {
   color: var(--color-ink-secondary);
 }
 
-/* Minimal load-error fallback (polished ErrorBanner is Story 2.5). */
-.load-error {
+/* Retryable load and mutation failures share one assertive banner. */
+.error-banner {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
   gap: var(--space-3);
   padding: var(--space-4);
+  margin-bottom: var(--space-6);
   background: var(--error-banner-bg);
   color: var(--error-banner-fg);
   border: 1px solid var(--error-banner-border);
   border-radius: var(--error-banner-radius);
 }
 
-.load-error__retry {
+.error-banner__retry {
   background: var(--button-primary-bg);
   color: var(--button-primary-fg);
   border: none;
@@ -123,8 +125,19 @@ select {
   cursor: pointer;
 }
 
-.load-error__retry:hover {
+.error-banner__retry:hover:not(:disabled) {
   background: var(--button-primary-bg-hover);
+}
+
+.error-banner__retry:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.error-banner__retry:disabled,
+.error-banner__retry[aria-busy='true'] {
+  cursor: wait;
+  opacity: 0.6;
 }
 
 /* --- Story 2.2: Add-Todo form (pinned above the list) --- */

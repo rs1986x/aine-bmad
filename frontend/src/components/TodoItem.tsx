@@ -22,6 +22,8 @@ interface TodoItemProps {
   onCancelEdit: () => void
   onSaveEdit: (description: string) => Promise<Todo>
   onRequestDelete: (trigger: HTMLButtonElement) => void
+  onFailure?: (owner: symbol, error: unknown, retry: () => Promise<void>) => void
+  onClearFailure?: (owner: symbol) => void
 }
 
 export function TodoItem({
@@ -33,17 +35,19 @@ export function TodoItem({
   onCancelEdit,
   onSaveEdit,
   onRequestDelete,
+  onFailure,
+  onClearFailure,
 }: TodoItemProps) {
   const { description, completed, createdAt } = todo
   const label = completed ? `Completed: ${description}` : description
   const [draft, setDraft] = useState(description)
   const [saving, setSaving] = useState(false)
   const [toggling, setToggling] = useState(false)
-  const [toggleError, setToggleError] = useState<string | null>(null)
   const [editError, setEditError] = useState<string | null>(null)
   const editButtonRef = useRef<HTMLButtonElement>(null)
   const deleteButtonRef = useRef<HTMLButtonElement>(null)
   const wasEditing = useRef(isEditing)
+  const failureOwner = useRef(Symbol(`todo-${todo.id}`)).current
   const editErrorId = `todo-edit-error-${todo.id}`
 
   useEffect(() => {
@@ -53,16 +57,36 @@ export function TodoItem({
     wasEditing.current = isEditing
   }, [isEditing])
 
-  const handleToggle = async () => {
+  const runToggle = async (clearStandingFailure: boolean): Promise<void> => {
     if (toggling || isEditing) return
-    setToggleError(null)
+    if (clearStandingFailure) onClearFailure?.(failureOwner)
     setToggling(true)
     try {
       await onToggle(todo)
-    } catch {
-      setToggleError("Couldn't save that change.")
+    } catch (failure) {
+      onFailure?.(failureOwner, failure, () => runToggle(false))
+      throw failure
     } finally {
       setToggling(false)
+    }
+  }
+
+  const handleToggle = () => {
+    void runToggle(true).catch(() => undefined)
+  }
+
+  const runEdit = async (description: string, clearStandingFailure: boolean): Promise<void> => {
+    if (saving) return
+    if (clearStandingFailure) onClearFailure?.(failureOwner)
+    setEditError(null)
+    setSaving(true)
+    try {
+      await onSaveEdit(description)
+    } catch (failure) {
+      onFailure?.(failureOwner, failure, () => runEdit(description, false))
+      throw failure
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -75,20 +99,13 @@ export function TodoItem({
       return
     }
 
-    setEditError(null)
-    setSaving(true)
-    try {
-      await onSaveEdit(trimmedDraft)
-    } catch {
-      setEditError("Couldn't save that change.")
-    } finally {
-      setSaving(false)
-    }
+    await runEdit(trimmedDraft, true).catch(() => undefined)
   }
 
   const handleEditKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Escape' && !saving) {
       event.preventDefault()
+      onClearFailure?.(failureOwner)
       onCancelEdit()
     }
   }
@@ -96,7 +113,7 @@ export function TodoItem({
   const handleCheckboxKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter') {
       event.preventDefault()
-      void handleToggle()
+      handleToggle()
     }
   }
 
@@ -115,7 +132,7 @@ export function TodoItem({
           type="checkbox"
           className="todo-item__checkbox"
           checked={completed}
-          onChange={() => void handleToggle()}
+          onChange={handleToggle}
           onKeyDown={handleCheckboxKeyDown}
           disabled={isEditing || toggling}
           aria-busy={toggling}
@@ -134,6 +151,7 @@ export function TodoItem({
             onChange={(event) => {
               setDraft(event.target.value)
               setEditError(null)
+              onClearFailure?.(failureOwner)
             }}
             onKeyDown={handleEditKeyDown}
             disabled={saving}
@@ -153,7 +171,10 @@ export function TodoItem({
             <button
               type="button"
               className="todo-item__cancel"
-              onClick={onCancelEdit}
+              onClick={() => {
+                onClearFailure?.(failureOwner)
+                onCancelEdit()
+              }}
               disabled={saving}
             >
               Cancel
@@ -161,9 +182,7 @@ export function TodoItem({
           </span>
         </form>
       ) : (
-        <span
-          className={`todo-item__desc${completed ? ' todo-item__desc--completed' : ''}`}
-        >
+        <span className={`todo-item__desc${completed ? ' todo-item__desc--completed' : ''}`}>
           {description}
         </span>
       )}
@@ -178,8 +197,8 @@ export function TodoItem({
           aria-label="Edit todo"
           onClick={() => {
             setDraft(description)
-            setToggleError(null)
             setEditError(null)
+            onClearFailure?.(failureOwner)
             onStartEdit()
           }}
           disabled={editDisabled || isEditing || toggling}
@@ -206,7 +225,10 @@ export function TodoItem({
           aria-label="Delete todo"
           data-todo-delete-id={todo.id}
           onClick={() => {
-            if (deleteButtonRef.current) onRequestDelete(deleteButtonRef.current)
+            if (deleteButtonRef.current) {
+              onClearFailure?.(failureOwner)
+              onRequestDelete(deleteButtonRef.current)
+            }
           }}
           disabled={editDisabled || isEditing || toggling}
         >
@@ -229,11 +251,6 @@ export function TodoItem({
           </svg>
         </button>
       </span>
-      {!isEditing && toggleError ? (
-        <span className="todo-item__error" role="alert">
-          {toggleError}
-        </span>
-      ) : null}
     </li>
   )
 }

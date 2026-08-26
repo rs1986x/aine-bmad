@@ -454,7 +454,7 @@ describe('TodoList', () => {
 
     await user.click(screen.getByRole('button', { name: 'Delete' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't save that change.")
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't save that change. Retry.")
     expect(screen.getByRole('dialog')).toBeInTheDocument()
     expect(activeNew).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Delete' })).not.toBeDisabled()

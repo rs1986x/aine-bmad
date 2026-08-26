@@ -62,3 +62,23 @@ describe('Story 2.4 delete dialog styles', () => {
     )
   })
 })
+
+describe('Story 2.5 reliability styles', () => {
+  it('uses existing tokens for the shared banner and Retry states', () => {
+    expect(css).toMatch(/\.error-banner\s*\{[^}]*background:\s*var\(--error-banner-bg\);/s)
+    expect(css).toMatch(/\.error-banner\s*\{[^}]*color:\s*var\(--error-banner-fg\);/s)
+    expect(css).toMatch(/\.error-banner__retry\s*\{[^}]*background:\s*var\(--button-primary-bg\);/s)
+    expect(css).toMatch(
+      /\.error-banner__retry:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--color-focus-ring\);[^}]*outline-offset:\s*2px;/s,
+    )
+    expect(css).toMatch(
+      /\.error-banner__retry:disabled,[\s\S]*\.error-banner__retry\[aria-busy='true'\]\s*\{[^}]*cursor:\s*wait;/s,
+    )
+  })
+
+  it('keeps the polite live region visually hidden with the shared utility', () => {
+    expect(css).toMatch(
+      /\.add-todo-form__label,\s*\.sr-only\s*\{[^}]*position:\s*absolute;[^}]*clip:\s*rect\(0, 0, 0, 0\);/s,
+    )
+  })
+})

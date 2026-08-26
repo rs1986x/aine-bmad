@@ -9,8 +9,10 @@ interface TodoListProps {
   todos: Todo[]
   onToggle: (todo: Todo) => Promise<Todo>
   onEdit: (id: string, description: string) => Promise<Todo>
-  onDelete: (id: string) => Promise<void>
+  onDelete: (id: string, description: string) => Promise<void>
   onFocusAdd: () => void
+  onFailure?: (owner: symbol, error: unknown, retry: () => Promise<void>) => void
+  onClearFailure?: (owner: symbol) => void
 }
 
 interface DeleteTarget {
@@ -18,7 +20,15 @@ interface DeleteTarget {
   trigger: HTMLButtonElement
 }
 
-export function TodoList({ todos, onToggle, onEdit, onDelete, onFocusAdd }: TodoListProps) {
+export function TodoList({
+  todos,
+  onToggle,
+  onEdit,
+  onDelete,
+  onFocusAdd,
+  onFailure,
+  onClearFailure,
+}: TodoListProps) {
   const [editingTodoId, setEditingTodoId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
   const listRef = useRef<HTMLUListElement>(null)
@@ -140,7 +150,7 @@ export function TodoList({ todos, onToggle, onEdit, onDelete, onFocusAdd }: Todo
     const targetId = deleteTarget.todo.id
     const targetIndex = orderedTodos.findIndex((todo) => todo.id === targetId)
 
-    await onDelete(targetId)
+    await onDelete(targetId, deleteTarget.todo.description)
     flushSync(() => setDeleteTarget(null))
     focusAfterDelete(targetIndex, targetId)
   }
@@ -152,6 +162,8 @@ export function TodoList({ todos, onToggle, onEdit, onDelete, onFocusAdd }: Todo
       isEditing={editingTodoId === todo.id}
       editDisabled={editingTodoId !== null && editingTodoId !== todo.id}
       onToggle={onToggle}
+      onFailure={onFailure}
+      onClearFailure={onClearFailure}
       onStartEdit={() => {
         if (editingTodoId === null) setEditingTodoId(todo.id)
       }}

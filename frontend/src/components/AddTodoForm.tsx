@@ -6,9 +6,13 @@ import { useEffect, useId, useRef, useState } from 'react'
 // list only updates when `onAdd` resolves; on rejection the typed text is kept.
 export function AddTodoForm({
   onAdd,
+  onFailure,
+  onClearFailure,
   focusRequest = 0,
 }: {
   onAdd: (description: string) => Promise<unknown>
+  onFailure?: (owner: symbol, error: unknown, retry: () => Promise<void>) => void
+  onClearFailure?: (owner: symbol) => void
   focusRequest?: number
 }) {
   const [value, setValue] = useState('')
@@ -17,6 +21,7 @@ export function AddTodoForm({
   const inputRef = useRef<HTMLInputElement>(null)
   const shouldRefocus = useRef(false)
   const handledFocusRequest = useRef(focusRequest)
+  const failureOwner = useRef(Symbol('add-todo')).current
   const inputId = useId()
   const errorId = useId()
 
@@ -38,35 +43,39 @@ export function AddTodoForm({
     inputRef.current?.focus()
   }, [focusRequest, submitting])
 
+  async function submit(description: string, clearStandingFailure: boolean): Promise<void> {
+    if (submitting) return
+    if (clearStandingFailure) onClearFailure?.(failureOwner)
+    setSubmitting(true)
+    setError(null)
+    try {
+      await onAdd(description)
+      setValue('')
+      shouldRefocus.current = true
+    } catch (failure) {
+      onFailure?.(failureOwner, failure, () => submit(description, false))
+      throw failure
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     if (submitting) return
 
     const trimmed = value.trim()
     if (trimmed === '') {
-      // Empty-validation: no network call, keep the typed text (AC #2).
       setError('Enter some text first.')
       return
     }
 
-    setSubmitting(true)
-    setError(null)
-    try {
-      await onAdd(trimmed)
-      setValue('')
-      shouldRefocus.current = true
-    } catch {
-      // Create failure (AC #6): keep the text, re-enable, show inline message.
-      // The polished Retry/banner/aria-live is Story 2.5.
-      setError("Couldn't save that change.")
-    } finally {
-      setSubmitting(false)
-    }
+    await submit(trimmed, true).catch(() => undefined)
   }
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     setValue(e.target.value)
-    // Typing clears a standing empty-validation message.
+    onClearFailure?.(failureOwner)
     if (error) setError(null)
   }
 

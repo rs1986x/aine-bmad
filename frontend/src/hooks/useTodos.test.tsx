@@ -41,7 +41,12 @@ describe('useTodos', () => {
 
   it('exposes the returned Todo[] on success', async () => {
     const todos: Todo[] = [
-      { id: '1', description: 'write tests', completed: false, createdAt: '2026-06-17T00:00:00Z' },
+      {
+        id: '00000000-0000-4000-8000-000000000000',
+        description: 'write tests',
+        completed: false,
+        createdAt: '2026-06-17T00:00:00Z',
+      },
     ]
     mockFetchOnce(todos, { ok: true, status: 200 })
     const { result } = renderHook(() => useTodos())
@@ -111,43 +116,50 @@ describe('useTodos', () => {
   it.each([
     [false, true],
     [true, false],
-  ])('toggles completed %s → %s using the exact server object', async (completed, nextCompleted) => {
-    const target: Todo = {
-      id: '1',
-      description: 'target',
-      completed,
-      createdAt: '2026-06-17T00:00:00Z',
-    }
-    const sibling: Todo = {
-      id: '2',
-      description: 'sibling',
-      completed: false,
-      createdAt: '2026-06-18T00:00:00Z',
-    }
-    const updated: Todo = {
-      ...target,
-      description: 'server-confirmed wording',
-      completed: nextCompleted,
-    }
-    vi.spyOn(api, 'getTodos').mockResolvedValue([target, sibling])
-    const update = vi.spyOn(api, 'updateTodo').mockResolvedValue(updated)
+  ])(
+    'toggles completed %s → %s using the exact server object',
+    async (completed, nextCompleted) => {
+      const target: Todo = {
+        id: '1',
+        description: 'target',
+        completed,
+        createdAt: '2026-06-17T00:00:00Z',
+      }
+      const sibling: Todo = {
+        id: '2',
+        description: 'sibling',
+        completed: false,
+        createdAt: '2026-06-18T00:00:00Z',
+      }
+      const updated: Todo = {
+        ...target,
+        description: 'server-confirmed wording',
+        completed: nextCompleted,
+      }
+      vi.spyOn(api, 'getTodos').mockResolvedValue([target, sibling])
+      const update = vi.spyOn(api, 'updateTodo').mockResolvedValue(updated)
 
-    const { result } = renderHook(() => useTodos())
-    await waitFor(() => expect(result.current.loading).toBe(false))
-    const previousArray = result.current.list
+      const { result } = renderHook(() => useTodos())
+      await waitFor(() => expect(result.current.loading).toBe(false))
+      const previousArray = result.current.list
 
-    await act(async () => {
-      await expect(result.current.toggleTodo(target)).resolves.toBe(updated)
-    })
+      await act(async () => {
+        await expect(result.current.toggleTodo(target)).resolves.toBe(updated)
+      })
 
-    expect(update).toHaveBeenCalledWith(target.id, { completed: nextCompleted })
-    expect(result.current.list).toEqual([updated, sibling])
-    expect(result.current.list[0]).toBe(updated)
-    expect(result.current.list[1]).toBe(sibling)
-    expect(result.current.list).not.toBe(previousArray)
-    expect(previousArray).toEqual([target, sibling])
-    expect(result.current.error).toBeNull()
-  })
+      expect(update).toHaveBeenCalledWith(
+        target.id,
+        { completed: nextCompleted },
+        expect.any(AbortSignal),
+      )
+      expect(result.current.list).toEqual([updated, sibling])
+      expect(result.current.list[0]).toBe(updated)
+      expect(result.current.list[1]).toBe(sibling)
+      expect(result.current.list).not.toBe(previousArray)
+      expect(previousArray).toEqual([target, sibling])
+      expect(result.current.error).toBeNull()
+    },
+  )
 
   it('edits through the shared confirmed-response replacement path', async () => {
     const existing: Todo = {
@@ -167,7 +179,11 @@ describe('useTodos', () => {
       await expect(result.current.editTodo(existing.id, 'edited draft')).resolves.toBe(updated)
     })
 
-    expect(update).toHaveBeenCalledWith(existing.id, { description: 'edited draft' })
+    expect(update).toHaveBeenCalledWith(
+      existing.id,
+      { description: 'edited draft' },
+      expect.any(AbortSignal),
+    )
     expect(result.current.list).toEqual([updated])
     expect(result.current.list[0]).toBe(updated)
   })
@@ -221,10 +237,12 @@ describe('useTodos', () => {
     const previousArray = result.current.list
 
     await act(async () => {
-      await expect(result.current.removeTodo(target.id)).resolves.toBeUndefined()
+      await expect(
+        result.current.removeTodo(target.id, target.description),
+      ).resolves.toBeUndefined()
     })
 
-    expect(remove).toHaveBeenCalledWith(target.id)
+    expect(remove).toHaveBeenCalledWith(target.id, expect.any(AbortSignal))
     expect(result.current.list).toEqual([sibling])
     expect(result.current.list[0]).toBe(sibling)
     expect(result.current.list).not.toBe(previousArray)
@@ -246,10 +264,437 @@ describe('useTodos', () => {
     await waitFor(() => expect(result.current.loading).toBe(false))
     const previousArray = result.current.list
 
-    await expect(result.current.removeTodo(existing.id)).rejects.toBeInstanceOf(ApiError)
+    await expect(
+      result.current.removeTodo(existing.id, existing.description),
+    ).rejects.toBeInstanceOf(ApiError)
 
     expect(result.current.list).toBe(previousArray)
     expect(result.current.list).toEqual([existing])
     expect(result.current.error).toBeNull()
+  })
+
+  it('announces each confirmed list change with exact polite copy', async () => {
+    const existing: Todo = {
+      id: '1',
+      description: 'Existing',
+      completed: false,
+      createdAt: '2026-06-17T00:00:00Z',
+    }
+    const created: Todo = {
+      id: '2',
+      description: 'Created',
+      completed: false,
+      createdAt: '2026-06-18T00:00:00Z',
+    }
+    vi.spyOn(api, 'getTodos').mockResolvedValue([existing])
+    vi.spyOn(api, 'createTodo').mockResolvedValue(created)
+    vi.spyOn(api, 'updateTodo')
+      .mockResolvedValueOnce({ ...existing, completed: true })
+      .mockResolvedValueOnce(existing)
+    vi.spyOn(api, 'deleteTodo').mockResolvedValue()
+    const { result } = renderHook(() => useTodos())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    await act(async () => {
+      await result.current.addTodo(created.description)
+    })
+    expect(result.current.announcement).toBe('Todo added: Created.')
+    act(() => result.current.dismissAnnouncement())
+
+    await act(async () => {
+      await result.current.toggleTodo(existing)
+    })
+    expect(result.current.announcement).toBe('Todo completed: Existing.')
+    act(() => result.current.dismissAnnouncement())
+
+    await act(async () => {
+      await result.current.toggleTodo({ ...existing, completed: true })
+    })
+    expect(result.current.announcement).toBe('Todo marked active: Existing.')
+    act(() => result.current.dismissAnnouncement())
+
+    await act(async () => {
+      await result.current.removeTodo(created.id, created.description)
+    })
+    expect(result.current.announcement).toBe('Todo deleted: Created.')
+  })
+
+  it('queues identical confirmed announcements as distinct live-region events', async () => {
+    const first: Todo = {
+      id: '1',
+      description: 'Same description',
+      completed: false,
+      createdAt: '2026-06-17T00:00:00Z',
+    }
+    const second: Todo = { ...first, id: '2' }
+    vi.spyOn(api, 'getTodos').mockResolvedValue([first, second])
+    vi.spyOn(api, 'updateTodo')
+      .mockResolvedValueOnce({ ...first, completed: true })
+      .mockResolvedValueOnce({ ...second, completed: true })
+    const { result } = renderHook(() => useTodos())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    await act(async () => {
+      await result.current.toggleTodo(first)
+      await result.current.toggleTodo(second)
+    })
+
+    const firstAnnouncementId = result.current.announcementId
+    expect(result.current.announcement).toBe('Todo completed: Same description.')
+    act(() => result.current.dismissAnnouncement())
+    expect(result.current.announcement).toBe('Todo completed: Same description.')
+    expect(result.current.announcementId).not.toBe(firstAnnouncementId)
+  })
+
+  it('does not let an older GET overwrite a confirmed mutation', async () => {
+    let resolveLoad: (todos: Todo[]) => void = () => {}
+    vi.spyOn(api, 'getTodos').mockReturnValue(
+      new Promise<Todo[]>((resolve) => {
+        resolveLoad = resolve
+      }),
+    )
+    const created: Todo = {
+      id: 'new',
+      description: 'Confirmed while loading',
+      completed: false,
+      createdAt: '2026-06-18T00:00:00Z',
+    }
+    vi.spyOn(api, 'createTodo').mockResolvedValue(created)
+    const { result } = renderHook(() => useTodos())
+
+    await act(async () => {
+      await result.current.addTodo(created.description)
+    })
+    expect(result.current.list).toEqual([created])
+
+    resolveLoad([])
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.list).toEqual([created])
+  })
+
+  it('does not let an older GET failure hide a confirmed mutation', async () => {
+    let rejectLoad: (error: Error) => void = () => {}
+    vi.spyOn(api, 'getTodos').mockReturnValue(
+      new Promise<Todo[]>((_resolve, reject) => {
+        rejectLoad = reject
+      }),
+    )
+    const created: Todo = {
+      id: 'new',
+      description: 'Confirmed before load failed',
+      completed: false,
+      createdAt: '2026-06-18T00:00:00Z',
+    }
+    vi.spyOn(api, 'createTodo').mockResolvedValue(created)
+    const { result } = renderHook(() => useTodos())
+
+    await act(async () => {
+      await result.current.addTodo(created.description)
+    })
+    rejectLoad(new ApiError('internal', 'stale load failure', 500))
+
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.list).toEqual([created])
+    expect(result.current.errorMessage).toBeNull()
+  })
+
+  it('aborts a superseded load and ignores its late completion', async () => {
+    let firstSignal: AbortSignal | undefined
+    let resolveFirst: (todos: Todo[]) => void = () => {}
+    const newer: Todo = {
+      id: 'newer',
+      description: 'Newer load',
+      completed: false,
+      createdAt: '2026-06-18T00:00:00Z',
+    }
+    vi.spyOn(api, 'getTodos')
+      .mockImplementationOnce((signal) => {
+        firstSignal = signal
+        return new Promise<Todo[]>((resolve) => {
+          resolveFirst = resolve
+        })
+      })
+      .mockResolvedValueOnce([newer])
+    const { result } = renderHook(() => useTodos())
+
+    act(() => result.current.reload())
+    await waitFor(() => expect(result.current.list).toEqual([newer]))
+    expect(firstSignal?.aborted).toBe(true)
+
+    resolveFirst([])
+    await act(async () => Promise.resolve())
+    expect(result.current.list).toEqual([newer])
+  })
+
+  it('aborts in-flight mutations when unmounted', async () => {
+    vi.spyOn(api, 'getTodos').mockResolvedValue([])
+    let mutationSignal: AbortSignal | undefined
+    vi.spyOn(api, 'createTodo').mockImplementation((_input, signal) => {
+      mutationSignal = signal
+      return new Promise<Todo>(() => {})
+    })
+    const { result, unmount } = renderHook(() => useTodos())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    void result.current.addTodo('Pending')
+    await waitFor(() => expect(mutationSignal).toBeDefined())
+    unmount()
+
+    expect(mutationSignal?.aborted).toBe(true)
+  })
+
+  it('classifies connection failures and makes Retry duplicate-safe', async () => {
+    vi.spyOn(api, 'getTodos').mockResolvedValue([])
+    let resolveRetry: () => void = () => {}
+    const retryAction = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveRetry = resolve
+        }),
+    )
+    const { result } = renderHook(() => useTodos())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    act(() => {
+      result.current.registerFailure(
+        Symbol('connection'),
+        new ApiError('connection_error', 'Backend is unreachable', 0),
+        retryAction,
+      )
+    })
+    expect(result.current.errorMessage).toBe("Couldn't connect. Check your connection and retry.")
+
+    act(() => {
+      result.current.retry()
+      result.current.retry()
+    })
+    expect(retryAction).toHaveBeenCalledOnce()
+    expect(result.current.retrying).toBe(true)
+    expect(result.current.errorMessage).toBe("Couldn't connect. Check your connection and retry.")
+
+    resolveRetry()
+    await waitFor(() => expect(result.current.retrying).toBe(false))
+    expect(result.current.errorMessage).toBeNull()
+  })
+
+  it('queues concurrent failures so each transaction retains a Retry path', async () => {
+    vi.spyOn(api, 'getTodos').mockResolvedValue([])
+    const firstRetry = vi.fn().mockResolvedValue(undefined)
+    const secondRetry = vi.fn().mockResolvedValue(undefined)
+    const { result } = renderHook(() => useTodos())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    act(() => {
+      result.current.registerFailure(
+        Symbol('first'),
+        new ApiError('internal', 'first', 500),
+        firstRetry,
+      )
+      result.current.registerFailure(
+        Symbol('second'),
+        new ApiError('connection_error', 'second', 0),
+        secondRetry,
+      )
+    })
+    expect(result.current.errorMessage).toBe("Couldn't save that change. Retry.")
+
+    act(() => result.current.retry())
+    await waitFor(() =>
+      expect(result.current.errorMessage).toBe(
+        "Couldn't connect. Check your connection and retry.",
+      ),
+    )
+    expect(firstRetry).toHaveBeenCalledOnce()
+
+    act(() => result.current.retry())
+    await waitFor(() => expect(result.current.errorMessage).toBeNull())
+    expect(secondRetry).toHaveBeenCalledOnce()
+  })
+
+  it('clears only the requested owner failure from the queue', async () => {
+    vi.spyOn(api, 'getTodos').mockResolvedValue([])
+    const firstOwner = Symbol('first')
+    const secondOwner = Symbol('second')
+    const { result } = renderHook(() => useTodos())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    act(() => {
+      result.current.registerFailure(
+        firstOwner,
+        new ApiError('internal', 'first', 500),
+        vi.fn().mockResolvedValue(undefined),
+      )
+      result.current.registerFailure(
+        secondOwner,
+        new ApiError('connection_error', 'second', 0),
+        vi.fn().mockResolvedValue(undefined),
+      )
+      result.current.clearFailure(firstOwner)
+    })
+
+    expect(result.current.errorMessage).toBe("Couldn't connect. Check your connection and retry.")
+  })
+
+  it('keeps a replay failure retryable when no replacement is registered', async () => {
+    vi.spyOn(api, 'getTodos').mockResolvedValue([])
+    const owner = Symbol('retry')
+    const retryAction = vi.fn().mockRejectedValue(new Error('failed again'))
+    const { result } = renderHook(() => useTodos())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    act(() => {
+      result.current.registerFailure(
+        owner,
+        new ApiError('internal', 'first failure', 500),
+        retryAction,
+      )
+    })
+    act(() => result.current.retry())
+
+    await waitFor(() => expect(result.current.retrying).toBe(false))
+    expect(retryAction).toHaveBeenCalledOnce()
+    expect(result.current.errorMessage).toBe("Couldn't save that change. Retry.")
+    act(() => result.current.retry())
+    await waitFor(() => expect(retryAction).toHaveBeenCalledTimes(2))
+  })
+
+  it('replaces only the attempted owner when its component re-registers', async () => {
+    vi.spyOn(api, 'getTodos').mockResolvedValue([])
+    const attemptedOwner = Symbol('attempted')
+    const queuedOwner = Symbol('queued')
+    const replacementRetry = vi.fn().mockResolvedValue(undefined)
+    const queuedRetry = vi.fn().mockResolvedValue(undefined)
+    const { result } = renderHook(() => useTodos())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    const attemptedRetry = vi.fn(async () => {
+      result.current.registerFailure(
+        attemptedOwner,
+        new ApiError('connection_error', 'replacement', 0),
+        replacementRetry,
+      )
+      throw new Error('failed again')
+    })
+
+    act(() => {
+      result.current.registerFailure(
+        attemptedOwner,
+        new ApiError('internal', 'attempted', 500),
+        attemptedRetry,
+      )
+      result.current.registerFailure(
+        queuedOwner,
+        new ApiError('internal', 'queued', 500),
+        queuedRetry,
+      )
+    })
+    act(() => result.current.retry())
+
+    await waitFor(() => expect(result.current.retrying).toBe(false))
+    expect(result.current.errorMessage).toBe("Couldn't connect. Check your connection and retry.")
+    act(() => result.current.retry())
+    await waitFor(() => {
+      expect(replacementRetry).toHaveBeenCalledOnce()
+      expect(result.current.errorMessage).toBe("Couldn't save that change. Retry.")
+    })
+    act(() => result.current.retry())
+    await waitFor(() => {
+      expect(queuedRetry).toHaveBeenCalledOnce()
+      expect(result.current.errorMessage).toBeNull()
+    })
+  })
+
+  it('rejects a create id collision without overwriting or announcing', async () => {
+    const existing: Todo = {
+      id: 'collision',
+      description: 'Existing',
+      completed: false,
+      createdAt: '2026-06-17T00:00:00Z',
+    }
+    vi.spyOn(api, 'getTodos').mockResolvedValue([existing])
+    vi.spyOn(api, 'createTodo').mockResolvedValue({
+      ...existing,
+      id: 'COLLISION',
+      description: 'Conflicting response',
+    })
+    const { result } = renderHook(() => useTodos())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    await expect(result.current.addTodo('New')).rejects.toEqual(
+      new ApiError('malformed_response', 'Created Todo id already exists', 0),
+    )
+    expect(result.current.list).toEqual([existing])
+    expect(result.current.announcement).toBe('')
+  })
+
+  it('reconciles overlapping GET data with confirmed create, update, and delete results', async () => {
+    const updateTarget: Todo = {
+      id: 'update',
+      description: 'Before',
+      completed: false,
+      createdAt: '2026-06-17T00:00:00Z',
+    }
+    const deleteTarget: Todo = {
+      id: 'delete',
+      description: 'Delete',
+      completed: false,
+      createdAt: '2026-06-16T00:00:00Z',
+    }
+    const unaffected: Todo = {
+      id: 'unaffected',
+      description: 'Fetched unaffected',
+      completed: false,
+      createdAt: '2026-06-18T00:00:00Z',
+    }
+    const created: Todo = {
+      id: 'created',
+      description: 'Created',
+      completed: false,
+      createdAt: '2026-06-19T00:00:00Z',
+    }
+    const updated = { ...updateTarget, description: 'Confirmed update' }
+    let resolveReload: (todos: Todo[]) => void = () => {}
+    vi.spyOn(api, 'getTodos')
+      .mockResolvedValueOnce([updateTarget, deleteTarget])
+      .mockReturnValueOnce(
+        new Promise<Todo[]>((resolve) => {
+          resolveReload = resolve
+        }),
+      )
+    vi.spyOn(api, 'createTodo').mockResolvedValue(created)
+    vi.spyOn(api, 'updateTodo').mockResolvedValue(updated)
+    vi.spyOn(api, 'deleteTodo').mockResolvedValue()
+    const { result } = renderHook(() => useTodos())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    act(() => result.current.reload())
+    await act(async () => {
+      await result.current.addTodo(created.description)
+      await result.current.editTodo(updateTarget.id, updated.description)
+      await result.current.removeTodo(deleteTarget.id, deleteTarget.description)
+    })
+    resolveReload([deleteTarget, unaffected])
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    expect(result.current.list).toEqual([updated, created, unaffected])
+  })
+
+  it('does not announce an update that cannot reconcile into the list', async () => {
+    const missing: Todo = {
+      id: 'missing',
+      description: 'Missing',
+      completed: true,
+      createdAt: '2026-06-17T00:00:00Z',
+    }
+    vi.spyOn(api, 'getTodos').mockResolvedValue([])
+    vi.spyOn(api, 'updateTodo').mockResolvedValue(missing)
+    const { result } = renderHook(() => useTodos())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    await act(async () => {
+      await result.current.toggleTodo({ ...missing, completed: false })
+    })
+
+    expect(result.current.list).toEqual([])
+    expect(result.current.announcement).toBe('')
   })
 })

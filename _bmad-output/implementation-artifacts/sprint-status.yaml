@@ -1,5 +1,5 @@
 # generated: 2026-06-16
-# last_updated: 2026-08-26 (story 2-4 → done via code-review)
+# last_updated: 2026-08-26 (story 2-5 → review)
 # project: aine-bmad
 # project_key: NOKEY
 # tracking_system: file-system
@@ -62,7 +62,7 @@ development_status:
   2-2-create-a-todo: done
   2-3-update-a-todo-complete-uncomplete-and-edit-description: done
   2-4-delete-a-todo-with-confirmation: done
-  2-5-error-handling-and-in-flight-reliability: backlog
+  2-5-error-handling-and-in-flight-reliability: review
   epic-2-retrospective: optional
 
   # --- Epic 3: Quality, Accessibility & Reliability Verification ---

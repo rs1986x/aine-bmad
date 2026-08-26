@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
+import { ApiError } from '../api/api'
 import { DeleteDialog } from './DeleteDialog'
 import type { Todo } from '../types/todo'
 
@@ -132,7 +133,7 @@ describe('DeleteDialog', () => {
 
     await user.click(screen.getByRole('button', { name: 'Delete' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't save that change.")
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't save that change. Retry.")
     expect(screen.getByRole('dialog')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Delete' })).not.toBeDisabled()
     expect(screen.getByRole('button', { name: 'Delete' })).toHaveFocus()
@@ -140,5 +141,25 @@ describe('DeleteDialog', () => {
     await user.click(screen.getByRole('button', { name: 'Delete' }))
     expect(onConfirm).toHaveBeenCalledTimes(2)
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('keeps a classified connection failure local to the open dialog', async () => {
+    const user = userEvent.setup()
+    render(
+      <DeleteDialog
+        todo={todo}
+        onCancel={vi.fn()}
+        onConfirm={vi
+          .fn()
+          .mockRejectedValue(new ApiError('connection_error', 'Backend is unreachable', 0))}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Delete' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      "Couldn't connect. Check your connection and retry.",
+    )
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
   })
 })
