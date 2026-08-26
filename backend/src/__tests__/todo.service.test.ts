@@ -39,3 +39,21 @@ describe('todoService.update', () => {
     ).rejects.toEqual(new NotFoundError('Todo not found'))
   })
 })
+
+describe('todoService.remove', () => {
+  it('delegates to the repository for an existing Todo', async () => {
+    const remove = vi.spyOn(todoRepository, 'remove').mockResolvedValueOnce(true)
+    const id = '00000000-0000-4000-8000-000000000000'
+
+    await expect(todoService.remove(id)).resolves.toBeUndefined()
+    expect(remove).toHaveBeenCalledWith(id)
+  })
+
+  it('throws the typed not-found error when the repository affects no row', async () => {
+    vi.spyOn(todoRepository, 'remove').mockResolvedValueOnce(false)
+
+    await expect(
+      todoService.remove('00000000-0000-4000-8000-000000000000'),
+    ).rejects.toEqual(new NotFoundError('Todo not found'))
+  })
+})

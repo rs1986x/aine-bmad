@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { ApiError, updateTodo } from './api'
+import { ApiError, deleteTodo, updateTodo } from './api'
 
 const updatedTodo = {
   id: '00000000-0000-4000-8000-000000000000',
@@ -65,6 +65,51 @@ describe('updateTodo', () => {
 
     await expect(updateTodo(updatedTodo.id, { completed: true })).rejects.toEqual(
       new ApiError('malformed_response', 'Expected a Todo', 200),
+    )
+  })
+})
+
+describe('deleteTodo', () => {
+  it('DELETEs the encoded Todo path and does not parse a successful 204 body', async () => {
+    const response = {
+      ok: true,
+      status: 204,
+      json: vi.fn(),
+    } as unknown as Response
+    const fetchMock = vi.fn().mockResolvedValue(response)
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(deleteTodo('todo/id with space')).resolves.toBeUndefined()
+    expect(fetchMock).toHaveBeenCalledWith('/api/todos/todo%2Fid%20with%20space', {
+      method: 'DELETE',
+    })
+    expect(response.json).not.toHaveBeenCalled()
+  })
+
+  it('maps a failed delete envelope to ApiError', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({ error: { code: 'NOT_FOUND', message: 'Todo not found' } }),
+          {
+            status: 404,
+            headers: { 'Content-Type': 'application/json' },
+          },
+        ),
+      ),
+    )
+
+    await expect(deleteTodo(updatedTodo.id)).rejects.toEqual(
+      new ApiError('NOT_FOUND', 'Todo not found', 404),
+    )
+  })
+
+  it('rejects an unexpected successful status instead of confirming removal', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 200 })))
+
+    await expect(deleteTodo(updatedTodo.id)).rejects.toEqual(
+      new ApiError('malformed_response', 'Expected 204 No Content', 200),
     )
   })
 })

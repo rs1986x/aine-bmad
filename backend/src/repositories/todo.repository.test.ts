@@ -70,3 +70,42 @@ describe('todoRepository.update', () => {
     expect(result).toBeNull()
   })
 })
+
+describe('todoRepository.remove', () => {
+  it('uses one parameterized delete and reports an affected row', async () => {
+    const query = vi.spyOn(pool, 'query')
+    const queryMock = query as unknown as ReturnType<typeof vi.fn>
+    queryMock.mockResolvedValueOnce({
+      rows: [{ id: '00000000-0000-4000-8000-000000000000' }],
+      rowCount: 1,
+      command: 'DELETE',
+      oid: 0,
+      fields: [],
+    })
+
+    await expect(
+      todoRepository.remove('00000000-0000-4000-8000-000000000000'),
+    ).resolves.toBe(true)
+    expect(query).toHaveBeenCalledOnce()
+    expect(query).toHaveBeenCalledWith(
+      expect.stringMatching(/DELETE FROM todos[\s\S]*WHERE id = \$1[\s\S]*RETURNING id/),
+      ['00000000-0000-4000-8000-000000000000'],
+    )
+  })
+
+  it('reports no affected row for an unknown id', async () => {
+    const query = vi.spyOn(pool, 'query')
+    const queryMock = query as unknown as ReturnType<typeof vi.fn>
+    queryMock.mockResolvedValueOnce({
+      rows: [],
+      rowCount: 0,
+      command: 'DELETE',
+      oid: 0,
+      fields: [],
+    })
+
+    await expect(
+      todoRepository.remove('00000000-0000-4000-8000-000000000000'),
+    ).resolves.toBe(false)
+  })
+})

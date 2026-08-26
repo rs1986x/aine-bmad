@@ -28,6 +28,7 @@ function renderItem(todo: Todo, overrides: Partial<ComponentProps<typeof TodoIte
     onStartEdit: vi.fn(),
     onCancelEdit: vi.fn(),
     onSaveEdit: vi.fn().mockResolvedValue(todo),
+    onRequestDelete: vi.fn(),
     ...overrides,
   }
   // TodoItem renders an <li>; wrap in a <ul> so the DOM is valid and the
@@ -101,6 +102,17 @@ describe('TodoItem', () => {
     expect(del).toHaveAttribute('type', 'button')
   })
 
+  it('registers the originating Delete control when deletion is requested', async () => {
+    const user = userEvent.setup()
+    const onRequestDelete = vi.fn()
+    renderItem(activeTodo, { onRequestDelete })
+    const del = screen.getByRole('button', { name: 'Delete todo' })
+
+    await user.click(del)
+
+    expect(onRequestDelete).toHaveBeenCalledWith(del)
+  })
+
   it('guards a pending toggle, exposes busy state, and waits for prop confirmation', async () => {
     const user = userEvent.setup()
     let resolveToggle: (todo: Todo) => void = () => {}
@@ -120,6 +132,7 @@ describe('TodoItem', () => {
     expect(checkbox).toHaveAttribute('aria-busy', 'true')
     expect(checkbox.closest('label')).toHaveClass('todo-item__checkbox-target--busy')
     expect(screen.getByRole('button', { name: 'Edit todo' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Delete todo' })).toBeDisabled()
     await user.click(checkbox)
     expect(onToggle).toHaveBeenCalledOnce()
 
@@ -204,6 +217,7 @@ describe('TodoItem', () => {
     const checkbox = screen.getByRole('checkbox')
     expect(checkbox).toBeDisabled()
     expect(checkbox.closest('label')).toHaveClass('todo-item__checkbox-target--disabled')
+    expect(screen.getByRole('button', { name: 'Delete todo' })).toBeDisabled()
   })
 
   it('trims a Save submission and debounces controls while pending', async () => {

@@ -199,4 +199,57 @@ describe('useTodos', () => {
       expect(result.current.error).toBeNull()
     },
   )
+
+  it('removes only the server-confirmed Todo with an immutable filter', async () => {
+    const target: Todo = {
+      id: '1',
+      description: 'target',
+      completed: false,
+      createdAt: '2026-06-17T00:00:00Z',
+    }
+    const sibling: Todo = {
+      id: '2',
+      description: 'sibling',
+      completed: true,
+      createdAt: '2026-06-18T00:00:00Z',
+    }
+    vi.spyOn(api, 'getTodos').mockResolvedValue([target, sibling])
+    const remove = vi.spyOn(api, 'deleteTodo').mockResolvedValue()
+
+    const { result } = renderHook(() => useTodos())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    const previousArray = result.current.list
+
+    await act(async () => {
+      await expect(result.current.removeTodo(target.id)).resolves.toBeUndefined()
+    })
+
+    expect(remove).toHaveBeenCalledWith(target.id)
+    expect(result.current.list).toEqual([sibling])
+    expect(result.current.list[0]).toBe(sibling)
+    expect(result.current.list).not.toBe(previousArray)
+    expect(previousArray).toEqual([target, sibling])
+    expect(result.current.error).toBeNull()
+  })
+
+  it('rethrows a failed deletion without changing list identity or load error', async () => {
+    const existing: Todo = {
+      id: '1',
+      description: 'unchanged',
+      completed: false,
+      createdAt: '2026-06-17T00:00:00Z',
+    }
+    vi.spyOn(api, 'getTodos').mockResolvedValue([existing])
+    vi.spyOn(api, 'deleteTodo').mockRejectedValue(new ApiError('internal', 'boom', 500))
+
+    const { result } = renderHook(() => useTodos())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    const previousArray = result.current.list
+
+    await expect(result.current.removeTodo(existing.id)).rejects.toBeInstanceOf(ApiError)
+
+    expect(result.current.list).toBe(previousArray)
+    expect(result.current.list).toEqual([existing])
+    expect(result.current.error).toBeNull()
+  })
 })

@@ -305,3 +305,45 @@ describe('PATCH /api/todos/:id', () => {
     },
   )
 })
+
+describe('DELETE /api/todos/:id', () => {
+  it('returns an empty 204, persists removal, and leaves siblings unchanged', async () => {
+    const target = await request(app).post('/api/todos').send({ description: 'Delete me' })
+    const sibling = await request(app).post('/api/todos').send({ description: 'Keep me' })
+
+    const res = await request(app).delete(`/api/todos/${target.body.id}`)
+
+    expect(res.status).toBe(204)
+    expect(res.text).toBe('')
+    const list = await request(app).get('/api/todos')
+    expect(list.status).toBe(200)
+    expect(list.body).toEqual([sibling.body])
+  })
+
+  it('returns 400 VALIDATION_ERROR for a malformed id without changing data', async () => {
+    const existing = await request(app).post('/api/todos').send({ description: 'Keep me' })
+
+    const res = await request(app).delete('/api/todos/not-a-uuid')
+
+    expect(res.status).toBe(400)
+    expect(res.body).toEqual({
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: expect.any(String),
+      },
+    })
+    const list = await request(app).get('/api/todos')
+    expect(list.body).toEqual([existing.body])
+  })
+
+  it('returns 404 NOT_FOUND for a valid absent UUID without changing data', async () => {
+    const existing = await request(app).post('/api/todos').send({ description: 'Keep me' })
+
+    const res = await request(app).delete(`/api/todos/${randomUUID()}`)
+
+    expect(res.status).toBe(404)
+    expect(res.body.error).toEqual({ code: 'NOT_FOUND', message: 'Todo not found' })
+    const list = await request(app).get('/api/todos')
+    expect(list.body).toEqual([existing.body])
+  })
+})

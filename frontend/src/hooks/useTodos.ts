@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Todo, UpdateTodoInput } from '../types/todo'
-import { createTodo, getTodos, updateTodo } from '../api/api'
+import { createTodo, deleteTodo, getTodos, updateTodo } from '../api/api'
 
 export interface UseTodos {
   list: Todo[]
@@ -10,6 +10,7 @@ export interface UseTodos {
   addTodo: (description: string) => Promise<Todo>
   toggleTodo: (todo: Todo) => Promise<Todo>
   editTodo: (id: string, description: string) => Promise<Todo>
+  removeTodo: (id: string) => Promise<void>
 }
 
 // Read path only. The server response is the only source of truth — no
@@ -53,6 +54,11 @@ export function useTodos(): UseTodos {
     [confirmedUpdate],
   )
 
+  const removeTodo = useCallback(async (id: string): Promise<void> => {
+    await deleteTodo(id)
+    setList((prev) => prev.filter((item) => item.id !== id))
+  }, [])
+
   const reload = useCallback(() => {
     // Reset request state here (an event callback) rather than synchronously in
     // the effect body, then re-trigger the effect. Initial mount already starts
@@ -84,5 +90,5 @@ export function useTodos(): UseTodos {
     }
   }, [reloadToken])
 
-  return { list, loading, error, reload, addTodo, toggleTodo, editTodo }
+  return { list, loading, error, reload, addTodo, toggleTodo, editTodo, removeTodo }
 }

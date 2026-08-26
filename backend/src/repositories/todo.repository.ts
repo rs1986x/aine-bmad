@@ -52,4 +52,15 @@ export const todoRepository = {
 
     return rows.length === 0 ? null : toTodo(rows[0])
   },
+
+  async remove(id: string): Promise<boolean> {
+    const { rows } = await pool.query<{ id: string }>(
+      `DELETE FROM todos
+       WHERE id = $1
+       RETURNING id`,
+      [id],
+    )
+
+    return rows.length > 0
+  },
 }

@@ -5,7 +5,7 @@ import { TodoList } from './components/TodoList'
 import { useTodos } from './hooks/useTodos'
 
 function App() {
-  const { list, loading, error, reload, addTodo, toggleTodo, editTodo } = useTodos()
+  const { list, loading, error, reload, addTodo, toggleTodo, editTodo, removeTodo } = useTodos()
 
   return (
     <main className="app-shell" aria-busy={loading}>
@@ -27,7 +27,12 @@ function App() {
           {list.length === 0 ? (
             <EmptyState />
           ) : (
-            <TodoList todos={list} onToggle={toggleTodo} onEdit={editTodo} />
+            <TodoList
+              todos={list}
+              onToggle={toggleTodo}
+              onEdit={editTodo}
+              onDelete={removeTodo}
+            />
           )}
         </>
       )}

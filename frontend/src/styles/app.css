@@ -462,3 +462,111 @@ select {
     opacity: 1;
   }
 }
+
+/* --- Story 2.4: destructive confirmation dialog --- */
+.delete-dialog__scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+  background: color-mix(in srgb, var(--color-ink-primary) 55%, transparent);
+}
+
+.delete-dialog {
+  width: min(100%, 480px);
+  max-height: calc(100svh - (2 * var(--space-4)));
+  overflow: auto;
+  padding: var(--space-6);
+  background: var(--color-surface-raised);
+  color: var(--color-ink-primary);
+  border: 1px solid var(--color-border-hairline);
+  border-radius: var(--radius-lg);
+}
+
+.delete-dialog__title {
+  margin: 0;
+  font-size: var(--font-size-title);
+  font-weight: var(--font-weight-title);
+  line-height: var(--line-height-title);
+}
+
+.delete-dialog__description {
+  margin: var(--space-3) 0 0;
+  color: var(--color-ink-secondary);
+  overflow-wrap: anywhere;
+}
+
+.delete-dialog__error {
+  margin: var(--space-3) 0 0;
+  color: var(--color-danger-text);
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-label);
+  line-height: var(--line-height-label);
+}
+
+.delete-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+}
+
+.delete-dialog__cancel,
+.delete-dialog__confirm {
+  min-height: 44px;
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+}
+
+.delete-dialog__cancel {
+  background: var(--button-secondary-bg);
+  color: var(--button-secondary-fg);
+  border: 1px solid var(--button-secondary-border);
+  border-radius: var(--button-secondary-radius);
+}
+
+.delete-dialog__confirm {
+  background: var(--button-danger-bg);
+  color: var(--button-danger-fg);
+  border: none;
+  border-radius: var(--button-danger-radius);
+}
+
+.delete-dialog__confirm:hover:not(:disabled) {
+  background: var(--button-danger-bg-hover);
+}
+
+.delete-dialog__cancel:focus-visible,
+.delete-dialog__confirm:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.delete-dialog__cancel:disabled,
+.delete-dialog__confirm:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.delete-dialog__confirm[aria-busy='true'] {
+  cursor: wait;
+}
+
+@media (max-width: 640px) {
+  .delete-dialog {
+    width: 100%;
+    padding: var(--space-4);
+  }
+
+  .delete-dialog__actions {
+    flex-direction: column-reverse;
+  }
+
+  .delete-dialog__cancel,
+  .delete-dialog__confirm {
+    width: 100%;
+  }
+}

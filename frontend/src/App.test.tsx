@@ -86,4 +86,29 @@ describe('App loading → empty transition', () => {
     ).toBeInTheDocument()
     expect(screen.getByRole('checkbox')).toBeChecked()
   })
+
+  it('removes the last Todo only after confirmation, renders empty state, and focuses Add', async () => {
+    const user = userEvent.setup()
+    const todo: Todo = {
+      id: '00000000-0000-4000-8000-000000000000',
+      description: 'Delete through App',
+      completed: false,
+      createdAt: '2026-08-26T08:00:00.000Z',
+    }
+    vi.spyOn(api, 'getTodos').mockResolvedValue([todo])
+    const remove = vi.spyOn(api, 'deleteTodo').mockResolvedValue()
+    render(<App />)
+    const item = await screen.findByRole('listitem', { name: 'Delete through App' })
+
+    await user.click(
+      item.querySelector<HTMLButtonElement>('button[aria-label="Delete todo"]')!,
+    )
+    expect(item).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Delete' }))
+
+    expect(remove).toHaveBeenCalledWith(todo.id)
+    expect(await screen.findByText('No todos yet.')).toBeInTheDocument()
+    expect(screen.queryByRole('listitem')).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.getByPlaceholderText('Add a todo…')).toHaveFocus())
+  })
 })

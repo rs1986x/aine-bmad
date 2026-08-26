@@ -1,5 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { TodoList } from './TodoList'
 import type { Todo } from '../types/todo'
@@ -23,11 +24,15 @@ function renderList(
       ...list.find((todo) => todo.id === id)!,
       description,
     })),
+  onDelete = vi.fn<(id: string) => Promise<void>>().mockResolvedValue(),
 ) {
   return {
     onToggle,
     onEdit,
-    ...render(<TodoList todos={list} onToggle={onToggle} onEdit={onEdit} />),
+    onDelete,
+    ...render(
+      <TodoList todos={list} onToggle={onToggle} onEdit={onEdit} onDelete={onDelete} />,
+    ),
   }
 }
 
@@ -78,6 +83,7 @@ describe('TodoList', () => {
     expect(screen.getByLabelText('Edit description for active new')).toBeInTheDocument()
     const otherRow = screen.getByRole('listitem', { name: 'active old' })
     expect(within(otherRow).getByRole('button', { name: 'Edit todo' })).toBeDisabled()
+    expect(within(activeNew).getByRole('button', { name: 'Delete todo' })).toBeDisabled()
   })
 
   it('forwards an edit and closes only after the confirmed response', async () => {
@@ -173,6 +179,7 @@ describe('TodoList', () => {
         todos={todos.map((todo) => (todo.id === confirmed.id ? confirmed : todo))}
         onToggle={onToggle}
         onEdit={vi.fn()}
+        onDelete={vi.fn()}
       />,
     )
 
@@ -200,6 +207,7 @@ describe('TodoList', () => {
         todos={todos.map((todo) => (todo.id === confirmed.id ? confirmed : todo))}
         onToggle={onToggle}
         onEdit={vi.fn()}
+        onDelete={vi.fn()}
       />,
     )
 
@@ -216,5 +224,115 @@ describe('TodoList', () => {
     expect(within(activeAgain).getByText('completed new')).not.toHaveClass(
       'todo-item__desc--completed',
     )
+  })
+
+  it('opens one confirmation dialog without changing the selected row', async () => {
+    const user = userEvent.setup()
+    renderList()
+    const activeNew = screen.getByRole('listitem', { name: 'active new' })
+
+    await user.click(within(activeNew).getByRole('button', { name: 'Delete todo' }))
+
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+    expect(screen.getByRole('dialog', { name: 'Delete this todo?' })).toHaveTextContent(
+      "“active new” — this can't be undone.",
+    )
+    expect(activeNew).toBeInTheDocument()
+  })
+
+  it.each(['Cancel', 'Escape'])(
+    'dismisses with %s, preserves the Todo, and restores Delete focus',
+    async (action) => {
+      const user = userEvent.setup()
+      const { onDelete } = renderList()
+      const activeNew = screen.getByRole('listitem', { name: 'active new' })
+      const trigger = within(activeNew).getByRole('button', { name: 'Delete todo' })
+      await user.click(trigger)
+
+      if (action === 'Cancel') {
+        await user.click(screen.getByRole('button', { name: 'Cancel' }))
+      } else {
+        await user.keyboard('{Escape}')
+      }
+
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+      expect(activeNew).toBeInTheDocument()
+      expect(onDelete).not.toHaveBeenCalled()
+      await waitFor(() => expect(trigger).toHaveFocus())
+    },
+  )
+
+  it('keeps the row during pending deletion, suppresses duplicates, then focuses a neighbor', async () => {
+    const user = userEvent.setup()
+    let resolveDelete: () => void = () => {}
+    const pending = new Promise<void>((resolve) => {
+      resolveDelete = resolve
+    })
+    const onDelete = vi.fn().mockReturnValue(pending)
+    renderList(todos, undefined, undefined, onDelete)
+    const activeNew = screen.getByRole('listitem', { name: 'active new' })
+    await user.click(within(activeNew).getByRole('button', { name: 'Delete todo' }))
+    const confirm = screen.getByRole('button', { name: 'Delete' })
+
+    await user.click(confirm)
+
+    expect(onDelete).toHaveBeenCalledOnce()
+    expect(onDelete).toHaveBeenCalledWith('3')
+    expect(activeNew).toBeInTheDocument()
+    expect(confirm).toBeDisabled()
+    confirm.click()
+    expect(onDelete).toHaveBeenCalledOnce()
+
+    resolveDelete()
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    const neighboringDelete = within(
+      screen.getByRole('listitem', { name: 'active old' }),
+    ).getByRole('button', { name: 'Delete todo' })
+    await waitFor(() => expect(neighboringDelete).toHaveFocus())
+  })
+
+  it("focuses the preceding Todo's Delete control after deleting the final displayed Todo", async () => {
+    const user = userEvent.setup()
+
+    function StatefulList() {
+      const [list, setList] = useState(todos)
+      return (
+        <TodoList
+          todos={list}
+          onToggle={async (todo) => todo}
+          onEdit={async (id, description) => ({
+            ...list.find((todo) => todo.id === id)!,
+            description,
+          })}
+          onDelete={async (id) => setList((current) => current.filter((todo) => todo.id !== id))}
+        />
+      )
+    }
+
+    render(<StatefulList />)
+    const finalTodo = screen.getByRole('listitem', { name: 'Completed: completed old' })
+    await user.click(within(finalTodo).getByRole('button', { name: 'Delete todo' }))
+    await user.click(screen.getByRole('button', { name: 'Delete' }))
+
+    await waitFor(() => expect(finalTodo).not.toBeInTheDocument())
+    const precedingDelete = within(
+      screen.getByRole('listitem', { name: 'Completed: completed new' }),
+    ).getByRole('button', { name: 'Delete todo' })
+    await waitFor(() => expect(precedingDelete).toHaveFocus())
+  })
+
+  it('keeps the dialog and Todo retryable after deletion fails', async () => {
+    const user = userEvent.setup()
+    const onDelete = vi.fn().mockRejectedValue(new Error('failed'))
+    renderList(todos, undefined, undefined, onDelete)
+    const activeNew = screen.getByRole('listitem', { name: 'active new' })
+    await user.click(within(activeNew).getByRole('button', { name: 'Delete todo' }))
+
+    await user.click(screen.getByRole('button', { name: 'Delete' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't save that change.")
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(activeNew).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Delete' })).not.toBeDisabled()
   })
 })

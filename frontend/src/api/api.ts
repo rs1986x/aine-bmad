@@ -83,6 +83,18 @@ export async function updateTodo(id: string, input: UpdateTodoInput): Promise<To
   return body
 }
 
+export async function deleteTodo(id: string): Promise<void> {
+  const response = await fetch(`${API_BASE}/todos/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  })
+  if (!response.ok) {
+    throw await toApiError(response)
+  }
+  if (response.status !== 204) {
+    throw new ApiError('malformed_response', 'Expected 204 No Content', response.status)
+  }
+}
+
 // Light runtime shape check so a malformed 2xx body surfaces as a typed
 // ApiError instead of crashing downstream render (mirrors getTodos's guard).
 function isTodo(value: unknown): value is Todo {
@@ -95,5 +107,3 @@ function isTodo(value: unknown): value is Todo {
     typeof todo.createdAt === 'string'
   )
 }
-
-// deleteTodo lands in Story 2.4.

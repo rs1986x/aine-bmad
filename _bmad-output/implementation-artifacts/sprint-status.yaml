@@ -61,7 +61,7 @@ development_status:
   2-1-render-the-populated-todo-list: done
   2-2-create-a-todo: done
   2-3-update-a-todo-complete-uncomplete-and-edit-description: done
-  2-4-delete-a-todo-with-confirmation: backlog
+  2-4-delete-a-todo-with-confirmation: review
   2-5-error-handling-and-in-flight-reliability: backlog
   epic-2-retrospective: optional
 

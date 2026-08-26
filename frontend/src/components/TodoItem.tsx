@@ -21,6 +21,7 @@ interface TodoItemProps {
   onStartEdit: () => void
   onCancelEdit: () => void
   onSaveEdit: (description: string) => Promise<Todo>
+  onRequestDelete: (trigger: HTMLButtonElement) => void
 }
 
 export function TodoItem({
@@ -31,6 +32,7 @@ export function TodoItem({
   onStartEdit,
   onCancelEdit,
   onSaveEdit,
+  onRequestDelete,
 }: TodoItemProps) {
   const { description, completed, createdAt } = todo
   const label = completed ? `Completed: ${description}` : description
@@ -40,6 +42,7 @@ export function TodoItem({
   const [toggleError, setToggleError] = useState<string | null>(null)
   const [editError, setEditError] = useState<string | null>(null)
   const editButtonRef = useRef<HTMLButtonElement>(null)
+  const deleteButtonRef = useRef<HTMLButtonElement>(null)
   const wasEditing = useRef(isEditing)
   const editErrorId = `todo-edit-error-${todo.id}`
 
@@ -196,7 +199,17 @@ export function TodoItem({
             <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
           </svg>
         </button>
-        <button type="button" className="todo-item__action" aria-label="Delete todo">
+        <button
+          ref={deleteButtonRef}
+          type="button"
+          className="todo-item__action"
+          aria-label="Delete todo"
+          data-todo-delete-id={todo.id}
+          onClick={() => {
+            if (deleteButtonRef.current) onRequestDelete(deleteButtonRef.current)
+          }}
+          disabled={editDisabled || isEditing || toggling}
+        >
           <svg
             width="18"
             height="18"

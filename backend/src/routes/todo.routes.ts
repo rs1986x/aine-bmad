@@ -49,4 +49,18 @@ router.patch('/todos/:id', async (req, res, next) => {
   }
 })
 
+router.delete('/todos/:id', async (req, res, next) => {
+  try {
+    const parsedId = todoIdSchema.safeParse(req.params.id)
+    if (!parsedId.success) {
+      throw new ValidationError(parsedId.error.issues[0]?.message ?? 'Invalid Todo id.')
+    }
+
+    await todoService.remove(parsedId.data)
+    res.status(204).send()
+  } catch (err) {
+    next(err)
+  }
+})
+
 export default router

@@ -25,4 +25,12 @@ export const todoService = {
 
     return todo
   },
+
+  async remove(id: string): Promise<void> {
+    const removed = await todoRepository.remove(id)
+
+    if (!removed) {
+      throw new NotFoundError('Todo not found')
+    }
+  },
 }

@@ -38,3 +38,26 @@ describe('Story 2.3 update styles', () => {
     expect(css).toMatch(/@media \(max-width:\s*640px\)[\s\S]*\.todo-item\s*\{[^}]*flex-wrap:\s*wrap;/)
   })
 })
+
+describe('Story 2.4 delete dialog styles', () => {
+  it('uses existing tokens for the scrim, surface, actions, and local error', () => {
+    expect(css).toMatch(
+      /\.delete-dialog__scrim\s*\{[^}]*background:\s*color-mix\(in srgb, var\(--color-ink-primary\)[^;]*;/s,
+    )
+    expect(css).toMatch(
+      /\.delete-dialog\s*\{[^}]*background:\s*var\(--color-surface-raised\);/s,
+    )
+    expect(css).toContain('background: var(--button-danger-bg);')
+    expect(css).toContain('background: var(--button-secondary-bg);')
+    expect(css).toMatch(/\.delete-dialog__error\s*\{[^}]*color:\s*var\(--color-danger-text\);/s)
+  })
+
+  it('provides busy, focus-visible, and narrow-layout treatment', () => {
+    expect(css).toMatch(/\.delete-dialog__confirm\[aria-busy='true'\]\s*\{[^}]*cursor:\s*wait;/s)
+    expect(css).toMatch(/\.delete-dialog__cancel:focus-visible/)
+    expect(css).toMatch(/\.delete-dialog__confirm:focus-visible/)
+    expect(css).toMatch(
+      /@media \(max-width:\s*640px\)[\s\S]*\.delete-dialog\s*\{[^}]*width:\s*100%;/s,
+    )
+  })
+})
