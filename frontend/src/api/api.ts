@@ -1,4 +1,4 @@
-import type { CreateTodoInput, Todo } from '../types/todo'
+import type { CreateTodoInput, Todo, UpdateTodoInput } from '../types/todo'
 
 // Typed error raised from the backend's `{ error: { code, message } }` envelope.
 // User-facing copy comes from EXPERIENCE.md — never the raw `message` here.
@@ -67,6 +67,22 @@ export async function createTodo(input: CreateTodoInput): Promise<Todo> {
   return body
 }
 
+export async function updateTodo(id: string, input: UpdateTodoInput): Promise<Todo> {
+  const response = await fetch(`${API_BASE}/todos/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  if (!response.ok) {
+    throw await toApiError(response)
+  }
+  const body: unknown = await response.json()
+  if (!isTodo(body)) {
+    throw new ApiError('malformed_response', 'Expected a Todo', response.status)
+  }
+  return body
+}
+
 // Light runtime shape check so a malformed 2xx body surfaces as a typed
 // ApiError instead of crashing downstream render (mirrors getTodos's guard).
 function isTodo(value: unknown): value is Todo {
@@ -80,4 +96,4 @@ function isTodo(value: unknown): value is Todo {
   )
 }
 
-// updateTodo / deleteTodo land in Stories 2.3–2.4.
+// deleteTodo lands in Story 2.4.

@@ -7,5 +7,5 @@ export interface Todo {
   createdAt: string // ISO-8601 UTC
 }
 
-// CreateTodoInput is defined (via z.infer) in schemas/todo.schema.ts — do not
-// duplicate it here. UpdateTodoInput lands alongside its Zod schema in Story 2.3.
+// CreateTodoInput and UpdateTodoInput are defined (via z.infer) in
+// schemas/todo.schema.ts — do not duplicate them here.

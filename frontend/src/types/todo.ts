@@ -14,4 +14,7 @@ export interface CreateTodoInput {
   description: string
 }
 
-// UpdateTodoInput is Story 2.3 — intentionally not defined here.
+export interface UpdateTodoInput {
+  description?: string
+  completed?: boolean
+}

@@ -107,4 +107,96 @@ describe('useTodos', () => {
     expect(result.current.error).toBeNull()
     expect(result.current.list).toEqual([existing])
   })
+
+  it.each([
+    [false, true],
+    [true, false],
+  ])('toggles completed %s → %s using the exact server object', async (completed, nextCompleted) => {
+    const target: Todo = {
+      id: '1',
+      description: 'target',
+      completed,
+      createdAt: '2026-06-17T00:00:00Z',
+    }
+    const sibling: Todo = {
+      id: '2',
+      description: 'sibling',
+      completed: false,
+      createdAt: '2026-06-18T00:00:00Z',
+    }
+    const updated: Todo = {
+      ...target,
+      description: 'server-confirmed wording',
+      completed: nextCompleted,
+    }
+    vi.spyOn(api, 'getTodos').mockResolvedValue([target, sibling])
+    const update = vi.spyOn(api, 'updateTodo').mockResolvedValue(updated)
+
+    const { result } = renderHook(() => useTodos())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    const previousArray = result.current.list
+
+    await act(async () => {
+      await expect(result.current.toggleTodo(target)).resolves.toBe(updated)
+    })
+
+    expect(update).toHaveBeenCalledWith(target.id, { completed: nextCompleted })
+    expect(result.current.list).toEqual([updated, sibling])
+    expect(result.current.list[0]).toBe(updated)
+    expect(result.current.list[1]).toBe(sibling)
+    expect(result.current.list).not.toBe(previousArray)
+    expect(previousArray).toEqual([target, sibling])
+    expect(result.current.error).toBeNull()
+  })
+
+  it('edits through the shared confirmed-response replacement path', async () => {
+    const existing: Todo = {
+      id: '1',
+      description: 'before',
+      completed: true,
+      createdAt: '2026-06-17T00:00:00Z',
+    }
+    const updated: Todo = { ...existing, description: 'server-confirmed edit' }
+    vi.spyOn(api, 'getTodos').mockResolvedValue([existing])
+    const update = vi.spyOn(api, 'updateTodo').mockResolvedValue(updated)
+
+    const { result } = renderHook(() => useTodos())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    await act(async () => {
+      await expect(result.current.editTodo(existing.id, 'edited draft')).resolves.toBe(updated)
+    })
+
+    expect(update).toHaveBeenCalledWith(existing.id, { description: 'edited draft' })
+    expect(result.current.list).toEqual([updated])
+    expect(result.current.list[0]).toBe(updated)
+  })
+
+  it.each(['toggleTodo', 'editTodo'] as const)(
+    'rethrows a failed %s without changing list identity or top-level error',
+    async (action) => {
+      const existing: Todo = {
+        id: '1',
+        description: 'unchanged',
+        completed: false,
+        createdAt: '2026-06-17T00:00:00Z',
+      }
+      vi.spyOn(api, 'getTodos').mockResolvedValue([existing])
+      vi.spyOn(api, 'updateTodo').mockRejectedValue(new ApiError('internal', 'boom', 500))
+
+      const { result } = renderHook(() => useTodos())
+      await waitFor(() => expect(result.current.loading).toBe(false))
+      const previousArray = result.current.list
+
+      await expect(
+        action === 'toggleTodo'
+          ? result.current.toggleTodo(existing)
+          : result.current.editTodo(existing.id, 'draft'),
+      ).rejects.toBeInstanceOf(ApiError)
+
+      expect(result.current.list).toBe(previousArray)
+      expect(result.current.list).toEqual([existing])
+      expect(result.current.error).toBeNull()
+    },
+  )
 })

@@ -1,7 +1,9 @@
 import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import * as api from './api/api'
+import type { Todo } from './types/todo'
 
 describe('App loading → empty transition', () => {
   beforeEach(() => {
@@ -60,5 +62,28 @@ describe('App loading → empty transition', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't load your todos.")
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
     expect(screen.queryByPlaceholderText('Add a todo…')).not.toBeInTheDocument()
+  })
+
+  it('wires a confirmed toggle through App, the hook, and the list', async () => {
+    const user = userEvent.setup()
+    const todo: Todo = {
+      id: '00000000-0000-4000-8000-000000000000',
+      description: 'Toggle through App',
+      completed: false,
+      createdAt: '2026-08-26T08:00:00.000Z',
+    }
+    const confirmed = { ...todo, completed: true }
+    vi.spyOn(api, 'getTodos').mockResolvedValue([todo])
+    const update = vi.spyOn(api, 'updateTodo').mockResolvedValue(confirmed)
+    render(<App />)
+    const checkbox = await screen.findByRole('checkbox')
+
+    await user.click(checkbox)
+
+    expect(update).toHaveBeenCalledWith(todo.id, { completed: true })
+    expect(
+      await screen.findByRole('listitem', { name: 'Completed: Toggle through App' }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('checkbox')).toBeChecked()
   })
 })

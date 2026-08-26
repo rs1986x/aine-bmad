@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { Todo } from '../types/todo'
-import { createTodo, getTodos } from '../api/api'
+import type { Todo, UpdateTodoInput } from '../types/todo'
+import { createTodo, getTodos, updateTodo } from '../api/api'
 
 export interface UseTodos {
   list: Todo[]
@@ -8,6 +8,8 @@ export interface UseTodos {
   error: Error | null
   reload: () => void
   addTodo: (description: string) => Promise<Todo>
+  toggleTodo: (todo: Todo) => Promise<Todo>
+  editTodo: (id: string, description: string) => Promise<Todo>
 }
 
 // Read path only. The server response is the only source of truth — no
@@ -28,6 +30,28 @@ export function useTodos(): UseTodos {
     setList((prev) => [created, ...prev])
     return created
   }, [])
+
+  const confirmedUpdate = useCallback(
+    async (id: string, input: UpdateTodoInput): Promise<Todo> => {
+      const updated = await updateTodo(id, input)
+      setList((prev) => prev.map((item) => (item.id === updated.id ? updated : item)))
+      return updated
+    },
+    [],
+  )
+
+  const toggleTodo = useCallback(
+    (todo: Todo): Promise<Todo> =>
+      confirmedUpdate(todo.id, {
+        completed: !todo.completed,
+      }),
+    [confirmedUpdate],
+  )
+
+  const editTodo = useCallback(
+    (id: string, description: string): Promise<Todo> => confirmedUpdate(id, { description }),
+    [confirmedUpdate],
+  )
 
   const reload = useCallback(() => {
     // Reset request state here (an event callback) rather than synchronously in
@@ -60,5 +84,5 @@ export function useTodos(): UseTodos {
     }
   }, [reloadToken])
 
-  return { list, loading, error, reload, addTodo }
+  return { list, loading, error, reload, addTodo, toggleTodo, editTodo }
 }

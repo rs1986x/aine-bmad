@@ -1,5 +1,5 @@
 import { pool } from '../db/pool'
-import type { CreateTodoInput } from '../schemas/todo.schema'
+import type { CreateTodoInput, UpdateTodoInput } from '../schemas/todo.schema'
 import type { Todo } from '../types/todo'
 
 // Raw DB row shape (snake_case). `pg` returns a JS Date for TIMESTAMPTZ.
@@ -38,5 +38,18 @@ export const todoRepository = {
       [input.description],
     )
     return toTodo(rows[0])
+  },
+
+  async update(id: string, input: UpdateTodoInput): Promise<Todo | null> {
+    const { rows } = await pool.query<TodoRow>(
+      `UPDATE todos
+       SET description = COALESCE($1, description),
+           completed = COALESCE($2, completed)
+       WHERE id = $3
+       RETURNING id, description, completed, created_at`,
+      [input.description ?? null, input.completed ?? null, id],
+    )
+
+    return rows.length === 0 ? null : toTodo(rows[0])
   },
 }

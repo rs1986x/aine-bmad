@@ -1,7 +1,7 @@
 import { Router } from 'express'
 
 import { ValidationError } from '../errors/AppError'
-import { createTodoSchema } from '../schemas/todo.schema'
+import { createTodoSchema, todoIdSchema, updateTodoSchema } from '../schemas/todo.schema'
 import { todoService } from '../services/todo.service'
 
 const router = Router()
@@ -25,6 +25,25 @@ router.post('/todos', async (req, res, next) => {
     }
     const todo = await todoService.create(parsed.data)
     res.status(201).json(todo)
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.patch('/todos/:id', async (req, res, next) => {
+  try {
+    const parsedId = todoIdSchema.safeParse(req.params.id)
+    if (!parsedId.success) {
+      throw new ValidationError(parsedId.error.issues[0]?.message ?? 'Invalid Todo id.')
+    }
+
+    const parsedBody = updateTodoSchema.safeParse(req.body)
+    if (!parsedBody.success) {
+      throw new ValidationError(parsedBody.error.issues[0]?.message ?? 'Invalid Todo update.')
+    }
+
+    const todo = await todoService.update(parsedId.data, parsedBody.data)
+    res.status(200).json(todo)
   } catch (err) {
     next(err)
   }

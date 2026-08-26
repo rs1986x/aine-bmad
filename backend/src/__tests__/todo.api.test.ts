@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto'
+
 import request from 'supertest'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -167,4 +169,139 @@ describe('POST /api/todos', () => {
     const list = await request(app).get('/api/todos')
     expect(list.body).toEqual([])
   })
+})
+
+describe('PATCH /api/todos/:id', () => {
+  it('returns 200 with the complete updated Todo', async () => {
+    const created = await request(app).post('/api/todos').send({ description: 'Buy milk' })
+
+    const res = await request(app).patch(`/api/todos/${created.body.id}`).send({ completed: true })
+
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({
+      ...created.body,
+      completed: true,
+    })
+  })
+
+  it('returns 400 VALIDATION_ERROR for a malformed id', async () => {
+    const res = await request(app).patch('/api/todos/not-a-uuid').send({ completed: true })
+
+    expect(res.status).toBe(400)
+    expect(res.body.error.code).toBe('VALIDATION_ERROR')
+  })
+
+  it('returns 404 NOT_FOUND for a valid absent UUID', async () => {
+    const res = await request(app).patch(`/api/todos/${randomUUID()}`).send({ completed: true })
+
+    expect(res.status).toBe(404)
+    expect(res.body.error.code).toBe('NOT_FOUND')
+    expect(res.body.error.message).toBe('Todo not found')
+  })
+
+  it('persists completed false → true → false with a complete camelCase response', async () => {
+    const created = await request(app).post('/api/todos').send({ description: 'Toggle me' })
+
+    const completed = await request(app)
+      .patch(`/api/todos/${created.body.id}`)
+      .send({ completed: true })
+    const activeAgain = await request(app)
+      .patch(`/api/todos/${created.body.id}`)
+      .send({ completed: false })
+
+    expect(completed.status).toBe(200)
+    expect(completed.body).toEqual({ ...created.body, completed: true })
+    expect(completed.body).not.toHaveProperty('created_at')
+    expect(activeAgain.status).toBe(200)
+    expect(activeAgain.body).toEqual(created.body)
+
+    const list = await request(app).get('/api/todos')
+    expect(list.body).toEqual([created.body])
+  })
+
+  it('trims a description update and preserves id, createdAt, and completed', async () => {
+    const created = await request(app).post('/api/todos').send({ description: 'Original' })
+
+    const res = await request(app)
+      .patch(`/api/todos/${created.body.id}`)
+      .send({ description: '  Updated wording  ' })
+
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({
+      ...created.body,
+      description: 'Updated wording',
+    })
+
+    const list = await request(app).get('/api/todos')
+    expect(list.body).toEqual([res.body])
+  })
+
+  it('updates both supported fields in one request', async () => {
+    const created = await request(app).post('/api/todos').send({ description: 'Original' })
+
+    const res = await request(app)
+      .patch(`/api/todos/${created.body.id}`)
+      .send({ description: 'Updated', completed: true })
+
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({
+      ...created.body,
+      description: 'Updated',
+      completed: true,
+    })
+  })
+
+  it('does not mutate a Todo when the id is malformed', async () => {
+    const created = await request(app).post('/api/todos').send({ description: 'Original' })
+
+    const res = await request(app).patch('/api/todos/not-a-uuid').send({ completed: true })
+
+    expect(res.status).toBe(400)
+    expect(res.body.error.code).toBe('VALIDATION_ERROR')
+    const list = await request(app).get('/api/todos')
+    expect(list.body).toEqual([created.body])
+  })
+
+  it.each([
+    ['empty object', {}],
+    ['extra-only object', { ignored: 'value' }],
+    ['array', []],
+    ['empty description', { description: '' }],
+    ['whitespace description', { description: '   ' }],
+    ['overlong description', { description: 'a'.repeat(501) }],
+    ['wrong description type', { description: 123 }],
+    ['wrong completed type', { completed: 'true' }],
+  ])('returns 400 VALIDATION_ERROR without mutation for %s', async (_case, body) => {
+    const created = await request(app).post('/api/todos').send({ description: 'Original' })
+
+    const res = await request(app).patch(`/api/todos/${created.body.id}`).send(body)
+
+    expect(res.status).toBe(400)
+    expect(res.body.error.code).toBe('VALIDATION_ERROR')
+    const list = await request(app).get('/api/todos')
+    expect(list.body).toEqual([created.body])
+  })
+
+  it('retains 400 BAD_REQUEST for malformed JSON', async () => {
+    const res = await request(app)
+      .patch(`/api/todos/${randomUUID()}`)
+      .set('Content-Type', 'application/json')
+      .send('{"completed":')
+
+    expect(res.status).toBe(400)
+    expect(res.body.error.code).toBe('BAD_REQUEST')
+  })
+
+  it.each(['true', '42', '"text"', 'null'])(
+    'retains 400 BAD_REQUEST for top-level JSON primitive %s',
+    async (body) => {
+      const res = await request(app)
+        .patch(`/api/todos/${randomUUID()}`)
+        .set('Content-Type', 'application/json')
+        .send(body)
+
+      expect(res.status).toBe(400)
+      expect(res.body.error.code).toBe('BAD_REQUEST')
+    },
+  )
 })

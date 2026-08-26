@@ -139,8 +139,9 @@ select {
   margin-bottom: var(--space-6);
 }
 
-/* Visually-hidden programmatic label (accessible name without visible text). */
-.add-todo-form__label {
+/* Visually-hidden programmatic labels (accessible names without visible text). */
+.add-todo-form__label,
+.sr-only {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -210,7 +211,7 @@ select {
   color: var(--color-danger-text);
 }
 
-/* --- Story 2.1: populated Todo list (display-only) --- */
+/* --- Populated Todo list and update interactions --- */
 
 /* TodoList — a single semantic <ul>, vertically stacked. */
 .todo-list {
@@ -233,12 +234,29 @@ select {
   padding: var(--todo-row-padding);
 }
 
-/* Checkbox — styled native control, 22px visual box; the check glyph is a
-   background SVG (input elements don't reliably support ::after). Display-only
-   in this story (readOnly, no handler). The ≥44px interactive hit area is
-   deferred to Story 2.3 — when the checkbox becomes interactive it can carry a
-   real sized target (e.g. a wrapping <label>); a pseudo-element on a replaced
-   <input> is not a reliable way to enlarge the target. See deferred-work.md. */
+.todo-item--editing {
+  background: var(--color-accent-subtle);
+}
+
+/* Real label wrapper expands the 22px visual control to a 44px touch target. */
+.todo-item__checkbox-target {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  flex: 0 0 44px;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.todo-item__checkbox-target--disabled {
+  cursor: not-allowed;
+}
+
+.todo-item__checkbox-target--busy {
+  cursor: wait;
+}
+
 .todo-item__checkbox {
   appearance: none;
   -webkit-appearance: none;
@@ -249,7 +267,7 @@ select {
   border: 2px solid var(--checkbox-border);
   border-radius: var(--checkbox-radius);
   background: var(--color-surface-raised);
-  cursor: default;
+  cursor: pointer;
 }
 
 .todo-item__checkbox:checked {
@@ -259,6 +277,23 @@ select {
   background-repeat: no-repeat;
   background-position: center;
   background-size: 70% 70%;
+}
+
+.todo-item__checkbox:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.todo-item__checkbox[aria-busy='true'] {
+  cursor: wait;
+}
+
+.todo-item__checkbox:focus-visible,
+.todo-item__action:focus-visible,
+.todo-item__save:focus-visible,
+.todo-item__cancel:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
 }
 
 /* Description — flex-grow so meta/actions sit right. */
@@ -272,6 +307,89 @@ select {
 .todo-item__desc--completed {
   text-decoration: line-through;
   color: var(--color-ink-muted);
+}
+
+.todo-item__edit {
+  flex: 1 1 320px;
+  min-width: 0;
+  max-width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.todo-item__edit-input {
+  order: 1;
+  flex: 1 1 220px;
+  min-width: 0;
+  max-width: 100%;
+  background: var(--input-text-bg);
+  color: var(--input-text-fg);
+  border: 1px solid var(--input-text-border);
+  border-radius: var(--input-text-radius);
+  padding: var(--input-text-padding);
+}
+
+.todo-item__edit-input:focus {
+  border-color: var(--input-text-border-focus);
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.todo-item__edit-input[aria-invalid='true'] {
+  border-color: var(--color-danger);
+}
+
+.todo-item__edit-actions {
+  order: 2;
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.todo-item__save,
+.todo-item__cancel {
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+}
+
+.todo-item__save {
+  background: var(--button-primary-bg);
+  color: var(--button-primary-fg);
+  border: none;
+  border-radius: var(--button-primary-radius);
+}
+
+.todo-item__save:hover:not(:disabled) {
+  background: var(--button-primary-bg-hover);
+}
+
+.todo-item__cancel {
+  background: var(--button-secondary-bg);
+  color: var(--button-secondary-fg);
+  border: 1px solid var(--button-secondary-border);
+  border-radius: var(--button-secondary-radius);
+}
+
+.todo-item__save:disabled,
+.todo-item__cancel:disabled,
+.todo-item__action:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.todo-item__error {
+  order: 3;
+  flex: 1 1 100%;
+  min-width: 0;
+  color: var(--color-danger-text);
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-label);
+  line-height: var(--line-height-label);
+  overflow-wrap: anywhere;
 }
 
 /* created_at meta — meta type ramp. */
@@ -327,6 +445,19 @@ select {
 
 /* Touch / below the single breakpoint: actions are always visible. */
 @media (max-width: 640px) {
+  .todo-item {
+    flex-wrap: wrap;
+  }
+
+  .todo-item__edit {
+    flex-basis: calc(100% - 44px - var(--todo-row-gap));
+  }
+
+  .todo-item__edit-input,
+  .todo-item__edit-actions {
+    flex-basis: 100%;
+  }
+
   .todo-item__actions {
     opacity: 1;
   }

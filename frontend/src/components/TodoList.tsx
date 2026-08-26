@@ -1,22 +1,41 @@
+import { useState } from 'react'
 import type { Todo } from '../types/todo'
 import { groupTodos } from '../utils/groupTodos'
 import { TodoItem } from './TodoItem'
 
-// Presentational only: receives todos as a prop from App (no hooks, no network,
-// no state). A single semantic <ul> keeps "the Todo List is a list"; the
-// Active/Completed separation is conveyed by order (groupTodos is the single
-// ordering authority).
-export function TodoList({ todos }: { todos: Todo[] }) {
+interface TodoListProps {
+  todos: Todo[]
+  onToggle: (todo: Todo) => Promise<Todo>
+  onEdit: (id: string, description: string) => Promise<Todo>
+}
+
+export function TodoList({ todos, onToggle, onEdit }: TodoListProps) {
+  const [editingTodoId, setEditingTodoId] = useState<string | null>(null)
   const { active, completed } = groupTodos(todos)
+
+  const renderTodo = (todo: Todo) => (
+    <TodoItem
+      key={todo.id}
+      todo={todo}
+      isEditing={editingTodoId === todo.id}
+      editDisabled={editingTodoId !== null && editingTodoId !== todo.id}
+      onToggle={onToggle}
+      onStartEdit={() => {
+        if (editingTodoId === null) setEditingTodoId(todo.id)
+      }}
+      onCancelEdit={() => setEditingTodoId(null)}
+      onSaveEdit={async (description) => {
+        const updated = await onEdit(todo.id, description)
+        setEditingTodoId(null)
+        return updated
+      }}
+    />
+  )
 
   return (
     <ul className="todo-list">
-      {active.map((todo) => (
-        <TodoItem key={todo.id} todo={todo} />
-      ))}
-      {completed.map((todo) => (
-        <TodoItem key={todo.id} todo={todo} />
-      ))}
+      {active.map(renderTodo)}
+      {completed.map(renderTodo)}
     </ul>
   )
 }

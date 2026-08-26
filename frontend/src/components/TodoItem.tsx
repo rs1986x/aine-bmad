@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import type { Todo } from '../types/todo'
 
 // Human-readable rendering of the ISO createdAt. Only the machine-readable
@@ -12,34 +13,174 @@ function formatCreatedAt(iso: string): string {
   })
 }
 
-// Display-only row. The checkbox and icon buttons are real, focusable, labeled
-// controls with no handlers — Story 2.3 wires toggle/edit, Story 2.4 wires
-// delete. The row's accessible name lives on the <li> via aria-label so it
-// resolves to exactly "{description}" / "Completed: {description}" without the
-// meta line or button labels polluting the computed name.
-export function TodoItem({ todo }: { todo: Todo }) {
+interface TodoItemProps {
+  todo: Todo
+  isEditing: boolean
+  editDisabled: boolean
+  onToggle: (todo: Todo) => Promise<Todo>
+  onStartEdit: () => void
+  onCancelEdit: () => void
+  onSaveEdit: (description: string) => Promise<Todo>
+}
+
+export function TodoItem({
+  todo,
+  isEditing,
+  editDisabled,
+  onToggle,
+  onStartEdit,
+  onCancelEdit,
+  onSaveEdit,
+}: TodoItemProps) {
   const { description, completed, createdAt } = todo
   const label = completed ? `Completed: ${description}` : description
+  const [draft, setDraft] = useState(description)
+  const [saving, setSaving] = useState(false)
+  const [toggling, setToggling] = useState(false)
+  const [toggleError, setToggleError] = useState<string | null>(null)
+  const [editError, setEditError] = useState<string | null>(null)
+  const editButtonRef = useRef<HTMLButtonElement>(null)
+  const wasEditing = useRef(isEditing)
+  const editErrorId = `todo-edit-error-${todo.id}`
+
+  useEffect(() => {
+    if (wasEditing.current && !isEditing) {
+      editButtonRef.current?.focus()
+    }
+    wasEditing.current = isEditing
+  }, [isEditing])
+
+  const handleToggle = async () => {
+    if (toggling || isEditing) return
+    setToggleError(null)
+    setToggling(true)
+    try {
+      await onToggle(todo)
+    } catch {
+      setToggleError("Couldn't save that change.")
+    } finally {
+      setToggling(false)
+    }
+  }
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (saving) return
+    const trimmedDraft = draft.trim()
+    if (trimmedDraft.length === 0) {
+      setEditError('Enter some text first.')
+      return
+    }
+
+    setEditError(null)
+    setSaving(true)
+    try {
+      await onSaveEdit(trimmedDraft)
+    } catch {
+      setEditError("Couldn't save that change.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleEditKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Escape' && !saving) {
+      event.preventDefault()
+      onCancelEdit()
+    }
+  }
+
+  const handleCheckboxKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      void handleToggle()
+    }
+  }
 
   return (
-    <li className="todo-item" aria-label={label}>
-      <input
-        type="checkbox"
-        className="todo-item__checkbox"
-        checked={completed}
-        readOnly
-        aria-label={completed ? 'Completed' : 'Not completed'}
-      />
-      <span
-        className={`todo-item__desc${completed ? ' todo-item__desc--completed' : ''}`}
+    <li className={`todo-item${isEditing ? ' todo-item--editing' : ''}`} aria-label={label}>
+      <label
+        className={`todo-item__checkbox-target${
+          toggling
+            ? ' todo-item__checkbox-target--busy'
+            : isEditing
+              ? ' todo-item__checkbox-target--disabled'
+              : ''
+        }`}
       >
-        {description}
-      </span>
+        <input
+          type="checkbox"
+          className="todo-item__checkbox"
+          checked={completed}
+          onChange={() => void handleToggle()}
+          onKeyDown={handleCheckboxKeyDown}
+          disabled={isEditing || toggling}
+          aria-busy={toggling}
+          aria-label={completed ? 'Completed' : 'Not completed'}
+        />
+      </label>
+      {isEditing ? (
+        <form className="todo-item__edit" onSubmit={(event) => void handleSubmit(event)}>
+          <label className="sr-only" htmlFor={`todo-edit-${todo.id}`}>
+            Edit description for {description}
+          </label>
+          <input
+            id={`todo-edit-${todo.id}`}
+            className="todo-item__edit-input"
+            value={draft}
+            onChange={(event) => {
+              setDraft(event.target.value)
+              setEditError(null)
+            }}
+            onKeyDown={handleEditKeyDown}
+            disabled={saving}
+            aria-invalid={editError ? true : undefined}
+            aria-describedby={editError ? editErrorId : undefined}
+            autoFocus
+          />
+          {editError ? (
+            <span id={editErrorId} className="todo-item__error" role="alert">
+              {editError}
+            </span>
+          ) : null}
+          <span className="todo-item__edit-actions">
+            <button type="submit" className="todo-item__save" disabled={saving}>
+              Save
+            </button>
+            <button
+              type="button"
+              className="todo-item__cancel"
+              onClick={onCancelEdit}
+              disabled={saving}
+            >
+              Cancel
+            </button>
+          </span>
+        </form>
+      ) : (
+        <span
+          className={`todo-item__desc${completed ? ' todo-item__desc--completed' : ''}`}
+        >
+          {description}
+        </span>
+      )}
       <time className="todo-item__meta" dateTime={createdAt}>
         {formatCreatedAt(createdAt)}
       </time>
       <span className="todo-item__actions">
-        <button type="button" className="todo-item__action" aria-label="Edit todo">
+        <button
+          ref={editButtonRef}
+          type="button"
+          className="todo-item__action"
+          aria-label="Edit todo"
+          onClick={() => {
+            setDraft(description)
+            setToggleError(null)
+            setEditError(null)
+            onStartEdit()
+          }}
+          disabled={editDisabled || isEditing || toggling}
+        >
           <svg
             width="18"
             height="18"
@@ -75,6 +216,11 @@ export function TodoItem({ todo }: { todo: Todo }) {
           </svg>
         </button>
       </span>
+      {!isEditing && toggleError ? (
+        <span className="todo-item__error" role="alert">
+          {toggleError}
+        </span>
+      ) : null}
     </li>
   )
 }
