@@ -10,6 +10,7 @@ const updatedTodo = {
 }
 
 afterEach(() => {
+  vi.restoreAllMocks()
   vi.unstubAllGlobals()
   vi.useRealTimers()
 })
@@ -171,17 +172,13 @@ describe('updateTodo', () => {
 
   it('rejects a late result when a noncompliant transport ignores abort', async () => {
     vi.useFakeTimers()
-    const startedAt = new Date('2026-08-26T08:00:00.000Z')
-    vi.setSystemTime(startedAt)
+    vi.spyOn(performance, 'now').mockReturnValueOnce(0).mockReturnValue(10_001)
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({
         ok: true,
         status: 200,
-        json: async () => {
-          vi.setSystemTime(new Date(startedAt.getTime() + 10_001))
-          return updatedTodo
-        },
+        json: async () => updatedTodo,
       } as Response),
     )
 
@@ -245,6 +242,44 @@ describe('updateTodo', () => {
       new ApiError('malformed_response', 'Expected the requested Todo', 200),
     )
   })
+
+  it('accepts equivalent UUID casing but rejects a response that ignored the requested update', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(updatedTodo), {
+          status: 200,
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ ...updatedTodo, completed: false }), {
+          status: 200,
+        }),
+      )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      updateTodo(updatedTodo.id.toUpperCase(), { completed: true }),
+    ).resolves.toEqual(updatedTodo)
+    await expect(updateTodo(updatedTodo.id, { completed: true })).rejects.toEqual(
+      new ApiError('malformed_response', 'Expected the applied Todo update', 200),
+    )
+  })
+
+  it('classifies a response-stream TypeError as a connection failure', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: vi.fn().mockRejectedValue(new TypeError('terminated')),
+      } as unknown as Response),
+    )
+
+    await expect(updateTodo(updatedTodo.id, { completed: true })).rejects.toEqual(
+      new ApiError('connection_error', 'Backend is unreachable', 0),
+    )
+  })
 })
 
 describe('createTodo', () => {
@@ -262,6 +297,28 @@ describe('createTodo', () => {
     await expect(createTodo({ description: updatedTodo.description })).resolves.toEqual(updatedTodo)
   })
 
+  it('sends a stable idempotency key when supplied', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(updatedTodo), {
+        status: 201,
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const key = '10000000-0000-4000-8000-000000000000'
+
+    await createTodo({ description: updatedTodo.description }, undefined, key)
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/todos',
+      expect.objectContaining({
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': key,
+        },
+      }),
+    )
+  })
+
   it('rejects malformed success JSON and Todo shapes', async () => {
     const fetchMock = vi
       .fn()
@@ -273,6 +330,33 @@ describe('createTodo', () => {
 
     await expect(createTodo({ description: 'Task' })).rejects.toEqual(
       new ApiError('malformed_response', 'Expected valid JSON', 201),
+    )
+    await expect(createTodo({ description: 'Task' })).rejects.toEqual(
+      new ApiError('malformed_response', 'Expected a Todo', 201),
+    )
+  })
+
+  it('rejects overlong descriptions and UUIDs outside the backend contract', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ ...updatedTodo, description: 'a'.repeat(501) }), {
+          status: 201,
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            ...updatedTodo,
+            id: '00000000-0000-0000-0000-000000000001',
+          }),
+          { status: 201 },
+        ),
+      )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(createTodo({ description: 'Task' })).rejects.toEqual(
+      new ApiError('malformed_response', 'Expected a Todo', 201),
     )
     await expect(createTodo({ description: 'Task' })).rejects.toEqual(
       new ApiError('malformed_response', 'Expected a Todo', 201),

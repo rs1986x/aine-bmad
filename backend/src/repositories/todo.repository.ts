@@ -29,15 +29,19 @@ export const todoRepository = {
     return rows.map(toTodo)
   },
 
-  async create(input: CreateTodoInput): Promise<Todo> {
-    // Parameterized insert (never interpolate input). id/completed/created_at
-    // all default in the DB (gen_random_uuid(), false, now()).
+  async create(input: CreateTodoInput, idempotencyKey: string): Promise<Todo | null> {
+    // A retry with the same key and description returns the original row.
+    // Reusing a key for a different payload returns no row so the service can
+    // report a typed conflict instead of silently accepting the wrong intent.
     const { rows } = await pool.query<TodoRow>(
-      `INSERT INTO todos (description) VALUES ($1)
+      `INSERT INTO todos (description, idempotency_key) VALUES ($1, $2)
+       ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL
+       DO UPDATE SET idempotency_key = EXCLUDED.idempotency_key
+       WHERE todos.description = EXCLUDED.description
        RETURNING id, description, completed, created_at`,
-      [input.description],
+      [input.description, idempotencyKey],
     )
-    return toTodo(rows[0])
+    return rows.length === 0 ? null : toTodo(rows[0])
   },
 
   async update(id: string, input: UpdateTodoInput): Promise<Todo | null> {

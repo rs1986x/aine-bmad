@@ -1,4 +1,4 @@
-import { NotFoundError } from '../errors/AppError'
+import { ConflictError, NotFoundError } from '../errors/AppError'
 import { todoRepository } from '../repositories/todo.repository'
 import type { CreateTodoInput, UpdateTodoInput } from '../schemas/todo.schema'
 import type { Todo } from '../types/todo'
@@ -10,10 +10,12 @@ export const todoService = {
     return todoRepository.list()
   },
 
-  // Thin delegate — the route's Zod parse is the validation boundary, so the
-  // service does not re-validate.
-  create(input: CreateTodoInput): Promise<Todo> {
-    return todoRepository.create(input)
+  async create(input: CreateTodoInput, idempotencyKey: string): Promise<Todo> {
+    const todo = await todoRepository.create(input, idempotencyKey)
+    if (todo === null) {
+      throw new ConflictError('Idempotency key was already used for a different create')
+    }
+    return todo
   },
 
   async update(id: string, input: UpdateTodoInput): Promise<Todo> {

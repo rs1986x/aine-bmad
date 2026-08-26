@@ -47,6 +47,7 @@ context: []
 - `frontend/src/components/TodoList.tsx:138-180` and `frontend/src/components/DeleteDialog.tsx:80-136` -- supply announcement context while keeping delete recovery local.
 - `frontend/src/styles/app.css:104-128` -- style the banner/live region with existing tokens; `tokens.css` remains read-only.
 - `frontend/src/{api/api,useTodos,App}.test.*` and `frontend/src/components/{ErrorBanner,AddTodoForm,TodoItem,TodoList,DeleteDialog}.test.tsx` -- reliability and regression seams.
+- `backend/migrations/002_add_todo_idempotency_key.sql`, `backend/src/routes/todo.routes.ts`, `backend/src/services/todo.service.ts`, `backend/src/repositories/todo.repository.ts`, and backend tests -- make create replay idempotent after uncertain timeouts.
 
 ## Tasks & Acceptance
 
@@ -64,8 +65,28 @@ context: []
 - Given assistive technology, when failure or confirmed list change occurs, then alerts are assertive, successes are polite/exact, and nothing is announced early.
 - Given Story 2.5 is complete, when frontend lint, typecheck, and tests run, then all new reliability cases and Stories 2.1–2.4 regressions pass without backend or token changes.
 
+### Review Findings
+
+- [x] [Review][Patch] Add backend/API idempotency-key support for create Retry after uncertain timeouts [frontend/src/api/api.ts:142; backend/src/services/todo.service.ts:15]
+- [x] [Review][Patch] Bound the confirmed-mutation journal to active overlapping loads [frontend/src/hooks/useTodos.ts:137]
+- [x] [Review][Patch] Clear owner failures and abort or invalidate owned work when transaction UI unmounts [frontend/src/components/AddTodoForm.tsx:24; frontend/src/components/TodoItem.tsx:50]
+- [x] [Review][Patch] Reject PATCH success responses that do not apply the requested fields [frontend/src/api/api.ts:187]
+- [x] [Review][Patch] Enforce UUID validity equivalent to the backend contract [frontend/src/api/api.ts:214]
+- [x] [Review][Patch] Compare requested and returned UUID identity case-insensitively [frontend/src/api/api.ts:191]
+- [x] [Review][Patch] Do not resolve a confirmed update when no state commit or explicit cancellation occurred [frontend/src/hooks/useTodos.ts:188]
+- [x] [Review][Patch] Treat a timeout-followed-by-404 delete retry as confirmed absence [frontend/src/hooks/useTodos.ts:230]
+- [x] [Review][Patch] Use a monotonic clock for request deadlines [frontend/src/api/api.ts:34]
+- [x] [Review][Patch] Preserve connection-error classification for response-body stream failures [frontend/src/api/api.ts:92]
+- [x] [Review][Patch] Preserve keyboard focus when a failed replay replaces the Retry banner [frontend/src/App.tsx:40]
+- [x] [Review][Patch] Verify pending, failed, timed-out, and aborted mutations never announce success [frontend/src/hooks/useTodos.test.tsx:290]
+- [x] [Review][Patch] Verify the rendered announcement queue advances automatically [frontend/src/App.test.tsx:138]
+- [x] [Review][Patch] Verify initial load cancellation on hook unmount [frontend/src/hooks/useTodos.test.tsx:429]
+- [x] [Review][Patch] Verify manual unchanged-draft resubmission invalidates the stale create Retry [frontend/src/components/AddTodoForm.test.tsx:79]
+- [x] [Review][Patch] Verify 501-character Todo payloads are rejected as malformed [frontend/src/api/api.test.ts:265]
+
 ## Spec Change Log
 
+- 2026-08-26: Applied code-review patches for idempotent create replay, owner cancellation, strict response contracts, bounded reconciliation, delete absence confirmation, Retry focus, and missing regression coverage.
 - 2026-08-26: Implemented all execution tasks; review hardened body-read deadlines, payload identity/shape checks, queued failures and announcements, stale-retry invalidation, and end-to-end recovery coverage.
 - 2026-08-26: Applied review fixes for exact transport contracts, owner-scoped retry replacement, overlapping-load reconciliation, collision safety, reusable punctuation, and second-failure replay coverage.
 
@@ -82,8 +103,9 @@ Keep transport in `useTodos`, but let create/edit/toggle owners register retry t
 **Actual results (2026-08-26):**
 - `npm run lint` -- passed with 0 errors.
 - `npm run typecheck` -- passed with 0 TypeScript errors.
-- `npm test` -- passed: 10 test files, 135 tests.
+- `npm test` -- passed: 10 test files, 147 tests.
 - `npm run build` -- passed with Vite 8.0.16; 27 modules transformed.
+- Backend lint, typecheck, tests, and build -- passed: 6 test files, 84 tests.
 
 **Manual checks (if no CLI):**
 - Disconnect the backend during load and create, then verify exact banner copy, preserved create text, one-request Retry, recovered focus, dialog-local delete failure, and correct screen-reader announcements.

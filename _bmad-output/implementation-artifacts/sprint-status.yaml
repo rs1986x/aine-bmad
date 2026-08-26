@@ -1,5 +1,5 @@
 # generated: 2026-06-16
-# last_updated: 2026-08-26 (story 2-5 → review)
+# last_updated: 2026-08-26 (story 2-5 and epic 2 → done)
 # project: aine-bmad
 # project_key: NOKEY
 # tracking_system: file-system
@@ -57,12 +57,12 @@ development_status:
   # --- Epic 2: The Complete Todo Experience ---
   # Vertical CRUD slices (route + service + repository + component) with UX states,
   # accessibility, error handling, and tests built into each story.
-  epic-2: in-progress
+  epic-2: done
   2-1-render-the-populated-todo-list: done
   2-2-create-a-todo: done
   2-3-update-a-todo-complete-uncomplete-and-edit-description: done
   2-4-delete-a-todo-with-confirmation: done
-  2-5-error-handling-and-in-flight-reliability: review
+  2-5-error-handling-and-in-flight-reliability: done
   epic-2-retrospective: optional
 
   # --- Epic 3: Quality, Accessibility & Reliability Verification ---

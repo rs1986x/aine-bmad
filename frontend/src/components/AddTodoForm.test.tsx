@@ -30,7 +30,7 @@ describe('AddTodoForm', () => {
     await user.keyboard('{Enter}')
 
     expect(onAdd).toHaveBeenCalledTimes(1)
-    expect(onAdd).toHaveBeenCalledWith('Buy milk')
+    expect(onAdd).toHaveBeenCalledWith('Buy milk', expect.anything(), expect.any(String))
     expect(input).toHaveValue('')
     expect(input).toHaveFocus()
   })
@@ -44,7 +44,7 @@ describe('AddTodoForm', () => {
     await user.click(screen.getByRole('button', { name: 'Add' }))
 
     expect(onAdd).toHaveBeenCalledTimes(1)
-    expect(onAdd).toHaveBeenCalledWith('Buy milk')
+    expect(onAdd).toHaveBeenCalledWith('Buy milk', expect.anything(), expect.any(String))
   })
 
   it('trims the value before calling onAdd', async () => {
@@ -55,7 +55,7 @@ describe('AddTodoForm', () => {
     await user.type(screen.getByRole('textbox', { name: /add a todo/i }), '  Buy milk  ')
     await user.keyboard('{Enter}')
 
-    expect(onAdd).toHaveBeenCalledWith('Buy milk')
+    expect(onAdd).toHaveBeenCalledWith('Buy milk', expect.anything(), expect.any(String))
   })
 
   it('rejects an empty/whitespace submit without calling onAdd and preserves the text', async () => {
@@ -98,7 +98,8 @@ describe('AddTodoForm', () => {
     const retry = onFailure.mock.calls[0][2] as () => Promise<void>
     await act(() => retry())
     expect(onAdd).toHaveBeenCalledTimes(2)
-    expect(onAdd).toHaveBeenLastCalledWith('Buy milk')
+    expect(onAdd).toHaveBeenLastCalledWith('Buy milk', expect.anything(), expect.any(String))
+    expect(onAdd.mock.calls[1][2]).toBe(onAdd.mock.calls[0][2])
     expect(input).toHaveValue('')
   })
 
@@ -123,6 +124,45 @@ describe('AddTodoForm', () => {
 
     expect(onClearFailure).toHaveBeenCalled()
     expect(input).toHaveValue('Original changed')
+  })
+
+  it('clears a stale create retry before manually resubmitting an unchanged draft', async () => {
+    const user = userEvent.setup()
+    const failure = new Error('boom')
+    const onAdd = vi.fn().mockRejectedValueOnce(failure).mockResolvedValueOnce(aTodo)
+    const onFailure = vi.fn()
+    const onClearFailure = vi.fn()
+    render(
+      <AddTodoForm
+        onAdd={onAdd}
+        onFailure={onFailure}
+        onClearFailure={onClearFailure}
+      />,
+    )
+    const input = screen.getByRole('textbox', { name: /add a todo/i })
+    await user.type(input, 'Buy milk')
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(onFailure).toHaveBeenCalledOnce())
+    const owner = onFailure.mock.calls[0][0] as symbol
+    onClearFailure.mockClear()
+
+    await user.keyboard('{Enter}')
+
+    expect(onClearFailure).toHaveBeenCalledWith(owner)
+    expect(onAdd).toHaveBeenCalledTimes(2)
+    expect(input).toHaveValue('')
+  })
+
+  it('releases its failure owner when unmounted', () => {
+    const onReleaseOwner = vi.fn()
+    const { unmount } = render(
+      <AddTodoForm onAdd={vi.fn()} onReleaseOwner={onReleaseOwner} />,
+    )
+
+    unmount()
+
+    expect(onReleaseOwner).toHaveBeenCalledOnce()
+    expect(onReleaseOwner).toHaveBeenCalledWith(expect.anything())
   })
 
   it('disables controls while in flight and guards against double-submit', async () => {

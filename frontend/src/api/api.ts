@@ -31,7 +31,7 @@ async function request<T>(
   consume: (response: Response) => Promise<T>,
 ): Promise<T> {
   const controller = new AbortController()
-  const deadline = Date.now() + REQUEST_TIMEOUT_MS
+  const deadline = performance.now() + REQUEST_TIMEOUT_MS
   let abortCause: 'caller' | 'timeout' | null = null
   let rejectAbort: (error: ApiError) => void = () => {}
   const abortResult = new Promise<never>((_resolve, reject) => {
@@ -64,7 +64,7 @@ async function request<T>(
     if (abortCause === 'caller') {
       throw new ApiError('aborted', 'Request aborted', 0)
     }
-    if (abortCause === 'timeout' || Date.now() >= deadline) {
+    if (abortCause === 'timeout' || performance.now() >= deadline) {
       abort('timeout')
       throw new ApiError('timeout', 'Request timed out', 0)
     }
@@ -73,7 +73,7 @@ async function request<T>(
     if (abortCause === 'caller') {
       throw new ApiError('aborted', 'Request aborted', 0)
     }
-    if (abortCause === 'timeout' || Date.now() >= deadline) {
+    if (abortCause === 'timeout' || performance.now() >= deadline) {
       throw new ApiError('timeout', 'Request timed out', 0)
     }
     if (error instanceof ApiError) {
@@ -92,7 +92,8 @@ async function request<T>(
 async function parseJson(response: Response): Promise<unknown> {
   try {
     return await response.json()
-  } catch {
+  } catch (error) {
+    if (error instanceof TypeError) throw error
     throw new ApiError('malformed_response', 'Expected valid JSON', response.status)
   }
 }
@@ -114,7 +115,8 @@ async function toApiError(response: Response): Promise<ApiError> {
         return new ApiError(envelope.code, envelope.message, response.status)
       }
     }
-  } catch {
+  } catch (error) {
+    if (error instanceof TypeError) throw error
     // Body was not JSON / not the expected shape — fall through to generic.
   }
   return new ApiError('unknown', `Request failed with status ${response.status}`, response.status)
@@ -139,12 +141,19 @@ export async function getTodos(signal?: AbortSignal): Promise<Todo[]> {
   })
 }
 
-export async function createTodo(input: CreateTodoInput, signal?: AbortSignal): Promise<Todo> {
+export async function createTodo(
+  input: CreateTodoInput,
+  signal?: AbortSignal,
+  idempotencyKey?: string,
+): Promise<Todo> {
   return request(
     `${API_BASE}/todos`,
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}),
+      },
       body: JSON.stringify(input),
       signal,
     },
@@ -188,8 +197,14 @@ export async function updateTodo(
       if (!isTodo(body)) {
         throw new ApiError('malformed_response', 'Expected a Todo', response.status)
       }
-      if (body.id !== id) {
+      if (body.id.toLowerCase() !== id.toLowerCase()) {
         throw new ApiError('malformed_response', 'Expected the requested Todo', response.status)
+      }
+      if (
+        (input.description !== undefined && body.description !== input.description.trim()) ||
+        (input.completed !== undefined && body.completed !== input.completed)
+      ) {
+        throw new ApiError('malformed_response', 'Expected the applied Todo update', response.status)
       }
       return body
     },
@@ -211,7 +226,8 @@ export async function deleteTodo(id: string, signal?: AbortSignal): Promise<void
   )
 }
 
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const ISO_UTC_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?Z$/
 
 function isUtcTimestamp(value: string): boolean {

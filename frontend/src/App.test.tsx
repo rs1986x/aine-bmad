@@ -12,6 +12,7 @@ describe('App loading → empty transition', () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
+    vi.useRealTimers()
   })
 
   it('shows the loading skeleton, then the empty state when the list is []', async () => {
@@ -133,6 +134,7 @@ describe('App loading → empty transition', () => {
     expect(create).toHaveBeenLastCalledWith(
       { description: created.description },
       expect.any(AbortSignal),
+      expect.any(String),
     )
     await waitFor(() => expect(input).toHaveValue(''))
     expect(
@@ -166,6 +168,7 @@ describe('App loading → empty transition', () => {
 
     expect(screen.getByRole('alert')).toHaveTextContent("Couldn't save that change. Retry.")
     expect(screen.getByRole('button', { name: 'Retry' })).not.toBeDisabled()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Retry' })).toHaveFocus())
     expect(input).toHaveValue(created.description)
 
     await user.click(screen.getByRole('button', { name: 'Retry' }))
@@ -362,5 +365,34 @@ describe('App loading → empty transition', () => {
     await waitFor(() =>
       expect(within(siblingRow).getByRole('button', { name: 'Delete todo' })).toHaveFocus(),
     )
+  })
+
+  it('advances queued live-region announcements automatically', async () => {
+    const user = userEvent.setup()
+    const first: Todo = {
+      id: '00000000-0000-4000-8000-000000000020',
+      description: 'First announcement',
+      completed: false,
+      createdAt: '2026-08-26T08:00:00.000Z',
+    }
+    const second: Todo = {
+      ...first,
+      id: '00000000-0000-4000-8000-000000000021',
+      description: 'Second announcement',
+    }
+    vi.spyOn(api, 'getTodos').mockResolvedValue([first, second])
+    vi.spyOn(api, 'updateTodo')
+      .mockResolvedValueOnce({ ...first, completed: true })
+      .mockResolvedValueOnce({ ...second, completed: true })
+    render(<App />)
+    const checkboxes = await screen.findAllByRole('checkbox')
+
+    await user.click(checkboxes[0])
+    await user.click(checkboxes[1])
+    expect(screen.getByText('Todo completed: First announcement.')).toBeInTheDocument()
+
+    expect(
+      await screen.findByText('Todo completed: Second announcement.', {}, { timeout: 2_000 }),
+    ).toBeInTheDocument()
   })
 })

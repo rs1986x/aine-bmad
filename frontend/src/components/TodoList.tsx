@@ -7,12 +7,13 @@ import { TodoItem } from './TodoItem'
 
 interface TodoListProps {
   todos: Todo[]
-  onToggle: (todo: Todo) => Promise<Todo>
-  onEdit: (id: string, description: string) => Promise<Todo>
+  onToggle: (todo: Todo, owner?: symbol) => Promise<Todo>
+  onEdit: (id: string, description: string, owner?: symbol) => Promise<Todo>
   onDelete: (id: string, description: string) => Promise<void>
   onFocusAdd: () => void
   onFailure?: (owner: symbol, error: unknown, retry: () => Promise<void>) => void
   onClearFailure?: (owner: symbol) => void
+  onReleaseOwner?: (owner: symbol) => void
 }
 
 interface DeleteTarget {
@@ -28,6 +29,7 @@ export function TodoList({
   onFocusAdd,
   onFailure,
   onClearFailure,
+  onReleaseOwner,
 }: TodoListProps) {
   const [editingTodoId, setEditingTodoId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
@@ -164,12 +166,13 @@ export function TodoList({
       onToggle={onToggle}
       onFailure={onFailure}
       onClearFailure={onClearFailure}
+      onReleaseOwner={onReleaseOwner}
       onStartEdit={() => {
         if (editingTodoId === null) setEditingTodoId(todo.id)
       }}
       onCancelEdit={() => setEditingTodoId(null)}
-      onSaveEdit={async (description) => {
-        const updated = await onEdit(todo.id, description)
+      onSaveEdit={async (description, owner) => {
+        const updated = await onEdit(todo.id, description, owner)
         setEditingTodoId(null)
         return updated
       }}

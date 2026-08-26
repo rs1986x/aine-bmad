@@ -45,9 +45,10 @@ export interface UseTodos {
   retry: () => void
   registerFailure: (owner: symbol, error: unknown, retry: () => Promise<void>) => void
   clearFailure: (owner: symbol) => void
-  addTodo: (description: string) => Promise<Todo>
-  toggleTodo: (todo: Todo) => Promise<Todo>
-  editTodo: (id: string, description: string) => Promise<Todo>
+  releaseOwner: (owner: symbol) => void
+  addTodo: (description: string, owner?: symbol, idempotencyKey?: string) => Promise<Todo>
+  toggleTodo: (todo: Todo, owner?: symbol) => Promise<Todo>
+  editTodo: (id: string, description: string, owner?: symbol) => Promise<Todo>
   removeTodo: (id: string, description: string) => Promise<void>
 }
 
@@ -81,13 +82,26 @@ export function useTodos(): UseTodos {
   const listRef = useRef<Todo[]>([])
   const mutationSequence = useRef(0)
   const confirmedMutations = useRef<ConfirmedMutation[]>([])
+  const activeLoadGeneration = useRef<number | null>(null)
   const mutationControllers = useRef(new Map<string, AbortController>())
   const mutationTokens = useRef(new Map<string, symbol>())
+  const mutationOwners = useRef(new Map<string, symbol>())
   const loadOwner = useRef(Symbol('load')).current
   const failure = failures[0] ?? null
 
   const clearFailure = useCallback((owner: symbol) => {
     setFailures((current) => current.filter((item) => item.owner !== owner))
+  }, [])
+
+  const releaseOwner = useCallback((owner: symbol) => {
+    setFailures((current) => current.filter((item) => item.owner !== owner))
+    mutationOwners.current.forEach((mutationOwner, key) => {
+      if (mutationOwner !== owner) return
+      mutationControllers.current.get(key)?.abort()
+      mutationControllers.current.delete(key)
+      mutationTokens.current.delete(key)
+      mutationOwners.current.delete(key)
+    })
   }, [])
 
   const registerFailure = useCallback(
@@ -117,12 +131,15 @@ export function useTodos(): UseTodos {
       commit: (current: Todo[], result: T) => Todo[] | null,
       reconcile: (todos: Todo[], result: T) => Todo[],
       successAnnouncement?: (result: T) => string,
+      owner?: symbol,
     ): Promise<T> => {
       mutationControllers.current.get(key)?.abort()
       const controller = new AbortController()
       const token = Symbol(key)
       mutationTokens.current.set(key, token)
       mutationControllers.current.set(key, controller)
+      if (owner) mutationOwners.current.set(key, owner)
+      else mutationOwners.current.delete(key)
 
       try {
         const result = await request(controller.signal)
@@ -134,10 +151,12 @@ export function useTodos(): UseTodos {
           listRef.current = committed
           setList(committed)
           mutationSequence.current += 1
-          confirmedMutations.current.push({
-            sequence: mutationSequence.current,
-            reconcile: (todos) => reconcile(todos, result),
-          })
+          if (activeLoadGeneration.current !== null) {
+            confirmedMutations.current.push({
+              sequence: mutationSequence.current,
+              reconcile: (todos) => reconcile(todos, result),
+            })
+          }
         }
         if (committed && successAnnouncement) {
           announcementId.current += 1
@@ -157,6 +176,7 @@ export function useTodos(): UseTodos {
         if (mutationTokens.current.get(key) === token) {
           mutationControllers.current.delete(key)
           mutationTokens.current.delete(key)
+          mutationOwners.current.delete(key)
         }
       }
     },
@@ -164,10 +184,14 @@ export function useTodos(): UseTodos {
   )
 
   const addTodo = useCallback(
-    (description: string): Promise<Todo> =>
+    (
+      description: string,
+      owner?: symbol,
+      idempotencyKey: string = crypto.randomUUID(),
+    ): Promise<Todo> =>
       runMutation(
         'create',
-        (signal) => createTodo({ description }, signal),
+        (signal) => createTodo({ description }, signal, idempotencyKey),
         (current, created) => {
           if (current.some((todo) => todo.id.toLowerCase() === created.id.toLowerCase())) {
             throw new ApiError('malformed_response', 'Created Todo id already exists', 0)
@@ -181,6 +205,7 @@ export function useTodos(): UseTodos {
               )
             : [created, ...todos],
         (created) => `Todo added: ${created.description}.`,
+        owner,
       ),
     [runMutation],
   )
@@ -190,25 +215,33 @@ export function useTodos(): UseTodos {
       id: string,
       input: UpdateTodoInput,
       successAnnouncement?: (todo: Todo) => string,
+      owner?: symbol,
     ): Promise<Todo> =>
       runMutation(
-        `update:${id}`,
+        `todo:${id}`,
         (signal) => updateTodo(id, input, signal),
         (current, updated) => {
-          if (!current.some((item) => item.id === updated.id)) return null
-          return current.map((item) => (item.id === updated.id ? updated : item))
+          if (!current.some((item) => item.id.toLowerCase() === updated.id.toLowerCase())) {
+            return [updated, ...current]
+          }
+          return current.map((item) =>
+            item.id.toLowerCase() === updated.id.toLowerCase() ? updated : item,
+          )
         },
         (todos, updated) =>
-          todos.some((item) => item.id === updated.id)
-            ? todos.map((item) => (item.id === updated.id ? updated : item))
+          todos.some((item) => item.id.toLowerCase() === updated.id.toLowerCase())
+            ? todos.map((item) =>
+                item.id.toLowerCase() === updated.id.toLowerCase() ? updated : item,
+              )
             : [updated, ...todos],
         successAnnouncement,
+        owner,
       ),
     [runMutation],
   )
 
   const toggleTodo = useCallback(
-    (todo: Todo): Promise<Todo> =>
+    (todo: Todo, owner?: symbol): Promise<Todo> =>
       confirmedUpdate(
         todo.id,
         {
@@ -218,20 +251,29 @@ export function useTodos(): UseTodos {
           updated.completed
             ? `Todo completed: ${updated.description}.`
             : `Todo marked active: ${updated.description}.`,
+        owner,
       ),
     [confirmedUpdate],
   )
 
   const editTodo = useCallback(
-    (id: string, description: string): Promise<Todo> => confirmedUpdate(id, { description }),
+    (id: string, description: string, owner?: symbol): Promise<Todo> =>
+      confirmedUpdate(id, { description }, undefined, owner),
     [confirmedUpdate],
   )
 
   const removeTodo = useCallback(
     (id: string, description: string): Promise<void> =>
       runMutation(
-        `delete:${id}`,
-        (signal) => deleteTodo(id, signal),
+        `todo:${id}`,
+        async (signal) => {
+          try {
+            await deleteTodo(id, signal)
+          } catch (error) {
+            if (error instanceof ApiError && error.status === 404) return
+            throw error
+          }
+        },
         (current) => {
           if (!current.some((item) => item.id === id)) return null
           return current.filter((item) => item.id !== id)
@@ -250,6 +292,7 @@ export function useTodos(): UseTodos {
       const mutationAtStart = mutationSequence.current
       const controller = new AbortController()
       loadController.current = controller
+      activeLoadGeneration.current = generation
       if (clearStandingFailure) clearFailure(loadOwner)
       setLoading(true)
 
@@ -282,6 +325,10 @@ export function useTodos(): UseTodos {
         })
         throw error
       } finally {
+        if (generation === activeLoadGeneration.current) {
+          activeLoadGeneration.current = null
+          confirmedMutations.current = []
+        }
         if (mounted.current && generation === loadGeneration.current) setLoading(false)
       }
     },
@@ -299,6 +346,7 @@ export function useTodos(): UseTodos {
   useEffect(() => {
     const controllers = mutationControllers.current
     const tokens = mutationTokens.current
+    const owners = mutationOwners.current
     mounted.current = true
     void runLoad(false).catch(() => undefined)
     return () => {
@@ -307,6 +355,7 @@ export function useTodos(): UseTodos {
       controllers.forEach((controller) => controller.abort())
       controllers.clear()
       tokens.clear()
+      owners.clear()
     }
   }, [runLoad])
 
@@ -349,6 +398,7 @@ export function useTodos(): UseTodos {
     retry,
     registerFailure,
     clearFailure,
+    releaseOwner,
     addTodo,
     toggleTodo,
     editTodo,

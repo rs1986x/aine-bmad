@@ -8,11 +8,13 @@ export function AddTodoForm({
   onAdd,
   onFailure,
   onClearFailure,
+  onReleaseOwner,
   focusRequest = 0,
 }: {
-  onAdd: (description: string) => Promise<unknown>
+  onAdd: (description: string, owner?: symbol, idempotencyKey?: string) => Promise<unknown>
   onFailure?: (owner: symbol, error: unknown, retry: () => Promise<void>) => void
   onClearFailure?: (owner: symbol) => void
+  onReleaseOwner?: (owner: symbol) => void
   focusRequest?: number
 }) {
   const [value, setValue] = useState('')
@@ -24,6 +26,8 @@ export function AddTodoForm({
   const failureOwner = useRef(Symbol('add-todo')).current
   const inputId = useId()
   const errorId = useId()
+
+  useEffect(() => () => onReleaseOwner?.(failureOwner), [failureOwner, onReleaseOwner])
 
   // Refocus after a successful add (AC #1). This runs in an effect rather than
   // right after the await because the input is still `disabled` at that point
@@ -43,17 +47,21 @@ export function AddTodoForm({
     inputRef.current?.focus()
   }, [focusRequest, submitting])
 
-  async function submit(description: string, clearStandingFailure: boolean): Promise<void> {
+  async function submit(
+    description: string,
+    clearStandingFailure: boolean,
+    idempotencyKey: string,
+  ): Promise<void> {
     if (submitting) return
     if (clearStandingFailure) onClearFailure?.(failureOwner)
     setSubmitting(true)
     setError(null)
     try {
-      await onAdd(description)
+      await onAdd(description, failureOwner, idempotencyKey)
       setValue('')
       shouldRefocus.current = true
     } catch (failure) {
-      onFailure?.(failureOwner, failure, () => submit(description, false))
+      onFailure?.(failureOwner, failure, () => submit(description, false, idempotencyKey))
       throw failure
     } finally {
       setSubmitting(false)
@@ -70,7 +78,7 @@ export function AddTodoForm({
       return
     }
 
-    await submit(trimmed, true).catch(() => undefined)
+    await submit(trimmed, true, crypto.randomUUID()).catch(() => undefined)
   }
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {

@@ -126,7 +126,7 @@ describe('TodoItem', () => {
     await user.click(checkbox)
 
     expect(onToggle).toHaveBeenCalledOnce()
-    expect(onToggle).toHaveBeenCalledWith(activeTodo)
+    expect(onToggle).toHaveBeenCalledWith(activeTodo, expect.anything())
     expect(checkbox).not.toBeChecked()
     expect(checkbox).toBeDisabled()
     expect(checkbox).toHaveAttribute('aria-busy', 'true')
@@ -153,7 +153,7 @@ describe('TodoItem', () => {
 
     await user.click(checkbox)
 
-    expect(onToggle).toHaveBeenCalledWith(completedTodo)
+    expect(onToggle).toHaveBeenCalledWith(completedTodo, expect.anything())
     expect(checkbox).toBeChecked()
     expect(screen.getByText('Walk the dog')).toHaveClass('todo-item__desc--completed')
 
@@ -184,7 +184,7 @@ describe('TodoItem', () => {
     const retry = onFailure.mock.calls[0][2] as () => Promise<void>
     await act(() => retry())
     expect(onToggle).toHaveBeenCalledTimes(2)
-    expect(onToggle).toHaveBeenLastCalledWith(activeTodo)
+    expect(onToggle).toHaveBeenLastCalledWith(activeTodo, expect.anything())
   })
 
   it('supports Enter activation and uses a semantic checkbox target wrapper', async () => {
@@ -196,7 +196,7 @@ describe('TodoItem', () => {
     expect(checkbox.closest('label')).toHaveClass('todo-item__checkbox-target')
     checkbox.focus()
     await user.keyboard('{Enter}')
-    expect(onToggle).toHaveBeenCalledWith(activeTodo)
+    expect(onToggle).toHaveBeenCalledWith(activeTodo, expect.anything())
   })
 
   it('supports native Space activation', async () => {
@@ -208,7 +208,7 @@ describe('TodoItem', () => {
     checkbox.focus()
     await user.keyboard(' ')
 
-    expect(onToggle).toHaveBeenCalledWith(activeTodo)
+    expect(onToggle).toHaveBeenCalledWith(activeTodo, expect.anything())
   })
 
   it('renders a pre-filled, labeled, focused inline editor', () => {
@@ -239,7 +239,7 @@ describe('TodoItem', () => {
     await user.type(input, '  updated wording  ')
     await user.click(screen.getByRole('button', { name: 'Save' }))
 
-    expect(onSaveEdit).toHaveBeenCalledWith('updated wording')
+    expect(onSaveEdit).toHaveBeenCalledWith('updated wording', expect.anything())
     expect(input).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled()
@@ -255,7 +255,7 @@ describe('TodoItem', () => {
 
     await user.type(screen.getByRole('textbox'), '{Enter}')
 
-    expect(onSaveEdit).toHaveBeenCalledWith('Buy milk')
+    expect(onSaveEdit).toHaveBeenCalledWith('Buy milk', expect.anything())
   })
 
   it.each(['Cancel', 'Escape'])('cancels with %s without saving', async (action) => {
@@ -314,9 +314,19 @@ describe('TodoItem', () => {
 
     const retry = onFailure.mock.calls[0][2] as () => Promise<void>
     await act(() => retry())
-    expect(onSaveEdit).toHaveBeenLastCalledWith('keep this draft')
+    expect(onSaveEdit).toHaveBeenLastCalledWith('keep this draft', expect.anything())
 
     await user.type(input, '!')
     expect(onClearFailure).toHaveBeenCalledOnce()
+  })
+
+  it('releases its failure owner when unmounted', () => {
+    const onReleaseOwner = vi.fn()
+    const { unmount } = renderItem(activeTodo, { onReleaseOwner })
+
+    unmount()
+
+    expect(onReleaseOwner).toHaveBeenCalledOnce()
+    expect(onReleaseOwner).toHaveBeenCalledWith(expect.anything())
   })
 })

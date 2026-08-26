@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { Router } from 'express'
 
 import { ValidationError } from '../errors/AppError'
@@ -23,7 +24,12 @@ router.post('/todos', async (req, res, next) => {
     if (!parsed.success) {
       throw new ValidationError(parsed.error.issues[0]?.message ?? 'Description must not be empty.')
     }
-    const todo = await todoService.create(parsed.data)
+    const suppliedKey = req.get('Idempotency-Key')
+    const parsedKey = suppliedKey ? todoIdSchema.safeParse(suppliedKey) : null
+    if (parsedKey && !parsedKey.success) {
+      throw new ValidationError('Invalid Idempotency-Key header.')
+    }
+    const todo = await todoService.create(parsed.data, parsedKey?.data ?? randomUUID())
     res.status(201).json(todo)
   } catch (err) {
     next(err)

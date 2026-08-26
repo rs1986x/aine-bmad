@@ -42,7 +42,7 @@ describe('migration runner', () => {
        WHERE table_name = 'todos' ORDER BY column_name`,
     )
     const columns = rows.map((r) => r.column_name)
-    expect(columns).toEqual(['completed', 'created_at', 'description', 'id'])
+    expect(columns).toEqual(['completed', 'created_at', 'description', 'id', 'idempotency_key'])
   })
 })
 
@@ -136,6 +136,46 @@ describe('POST /api/todos', () => {
     expect(res.body).toHaveLength(1)
     expect(res.body[0].description).toBe('Buy milk')
     expect(res.body[0].completed).toBe(false)
+  })
+
+  it('returns the original Todo when the same idempotency key is retried', async () => {
+    const key = randomUUID()
+    const first = await request(app)
+      .post('/api/todos')
+      .set('Idempotency-Key', key)
+      .send({ description: 'Buy milk' })
+    const retry = await request(app)
+      .post('/api/todos')
+      .set('Idempotency-Key', key)
+      .send({ description: 'Buy milk' })
+
+    expect(first.status).toBe(201)
+    expect(retry.status).toBe(201)
+    expect(retry.body).toEqual(first.body)
+    const list = await request(app).get('/api/todos')
+    expect(list.body).toEqual([first.body])
+  })
+
+  it('rejects invalid or reused idempotency keys with a different payload', async () => {
+    const key = randomUUID()
+    await request(app)
+      .post('/api/todos')
+      .set('Idempotency-Key', key)
+      .send({ description: 'First intent' })
+
+    const conflict = await request(app)
+      .post('/api/todos')
+      .set('Idempotency-Key', key)
+      .send({ description: 'Different intent' })
+    const invalid = await request(app)
+      .post('/api/todos')
+      .set('Idempotency-Key', 'not-a-uuid')
+      .send({ description: 'Invalid key' })
+
+    expect(conflict.status).toBe(409)
+    expect(conflict.body.error.code).toBe('CONFLICT')
+    expect(invalid.status).toBe(400)
+    expect(invalid.body.error.code).toBe('VALIDATION_ERROR')
   })
 
   it('rejects a whitespace-only description with 400 and persists nothing', async () => {

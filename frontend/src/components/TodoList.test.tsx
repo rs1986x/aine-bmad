@@ -76,7 +76,7 @@ describe('TodoList', () => {
 
     await user.click(checkbox)
 
-    expect(toggle).toHaveBeenCalledWith(todos[2])
+    expect(toggle).toHaveBeenCalledWith(todos[2], expect.anything())
     expect(checkbox).not.toBeChecked()
   })
 
@@ -109,7 +109,7 @@ describe('TodoList', () => {
     await user.type(input, 'updated wording')
     await user.click(screen.getByRole('button', { name: 'Save' }))
 
-    expect(onEdit).toHaveBeenCalledWith('3', 'updated wording')
+    expect(onEdit).toHaveBeenCalledWith('3', 'updated wording', expect.anything())
     expect(screen.getByRole('textbox')).toBeDisabled()
 
     resolveEdit({ ...todos[2], description: 'updated wording' })
@@ -181,7 +181,7 @@ describe('TodoList', () => {
     const activeNew = screen.getByRole('listitem', { name: 'active new' })
 
     await user.click(within(activeNew).getByRole('checkbox'))
-    await waitFor(() => expect(onToggle).toHaveBeenCalledWith(todos[2]))
+    await waitFor(() => expect(onToggle).toHaveBeenCalledWith(todos[2], expect.anything()))
     rerender(
       <TodoList
         todos={todos.map((todo) => (todo.id === confirmed.id ? confirmed : todo))}
@@ -208,7 +208,7 @@ describe('TodoList', () => {
     const completedNew = screen.getByRole('listitem', { name: 'Completed: completed new' })
 
     await user.click(within(completedNew).getByRole('checkbox'))
-    await waitFor(() => expect(onToggle).toHaveBeenCalledWith(todos[1]))
+    await waitFor(() => expect(onToggle).toHaveBeenCalledWith(todos[1], expect.anything()))
     rerender(
       <TodoList
         todos={todos.map((todo) => (todo.id === confirmed.id ? confirmed : todo))}

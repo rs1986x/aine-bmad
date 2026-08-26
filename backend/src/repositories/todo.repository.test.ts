@@ -7,6 +7,63 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
+describe('todoRepository.create', () => {
+  it('upserts by idempotency key and maps the returned row', async () => {
+    const createdAt = new Date('2026-08-26T08:00:00.000Z')
+    const query = vi.spyOn(pool, 'query')
+    const queryMock = query as unknown as ReturnType<typeof vi.fn>
+    queryMock.mockResolvedValueOnce({
+      rows: [
+        {
+          id: '00000000-0000-4000-8000-000000000000',
+          description: 'Created task',
+          completed: false,
+          created_at: createdAt,
+        },
+      ],
+      rowCount: 1,
+      command: 'INSERT',
+      oid: 0,
+      fields: [],
+    })
+    const key = '10000000-0000-4000-8000-000000000000'
+
+    const result = await todoRepository.create({ description: 'Created task' }, key)
+
+    expect(query).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /INSERT INTO todos \(description, idempotency_key\)[\s\S]*ON CONFLICT \(idempotency_key\)[\s\S]*WHERE todos.description = EXCLUDED.description/,
+      ),
+      ['Created task', key],
+    )
+    expect(result).toEqual({
+      id: '00000000-0000-4000-8000-000000000000',
+      description: 'Created task',
+      completed: false,
+      createdAt: createdAt.toISOString(),
+    })
+  })
+
+  it('returns null when a reused key has a different description', async () => {
+    const query = vi.spyOn(pool, 'query')
+    const queryMock = query as unknown as ReturnType<typeof vi.fn>
+    queryMock.mockResolvedValueOnce({
+      rows: [],
+      rowCount: 0,
+      command: 'INSERT',
+      oid: 0,
+      fields: [],
+    })
+
+    await expect(
+      todoRepository.create(
+        { description: 'Different task' },
+        '10000000-0000-4000-8000-000000000000',
+      ),
+    ).resolves.toBeNull()
+  })
+})
+
 describe('todoRepository.update', () => {
   it('uses one parameterized update and maps the returned row', async () => {
     const createdAt = new Date('2026-08-26T08:00:00.000Z')

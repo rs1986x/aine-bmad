@@ -17,13 +17,14 @@ interface TodoItemProps {
   todo: Todo
   isEditing: boolean
   editDisabled: boolean
-  onToggle: (todo: Todo) => Promise<Todo>
+  onToggle: (todo: Todo, owner?: symbol) => Promise<Todo>
   onStartEdit: () => void
   onCancelEdit: () => void
-  onSaveEdit: (description: string) => Promise<Todo>
+  onSaveEdit: (description: string, owner?: symbol) => Promise<Todo>
   onRequestDelete: (trigger: HTMLButtonElement) => void
   onFailure?: (owner: symbol, error: unknown, retry: () => Promise<void>) => void
   onClearFailure?: (owner: symbol) => void
+  onReleaseOwner?: (owner: symbol) => void
 }
 
 export function TodoItem({
@@ -37,6 +38,7 @@ export function TodoItem({
   onRequestDelete,
   onFailure,
   onClearFailure,
+  onReleaseOwner,
 }: TodoItemProps) {
   const { description, completed, createdAt } = todo
   const label = completed ? `Completed: ${description}` : description
@@ -47,8 +49,10 @@ export function TodoItem({
   const editButtonRef = useRef<HTMLButtonElement>(null)
   const deleteButtonRef = useRef<HTMLButtonElement>(null)
   const wasEditing = useRef(isEditing)
-  const failureOwner = useRef(Symbol(`todo-${todo.id}`)).current
+  const [failureOwner] = useState(() => Symbol(`todo-${todo.id}`))
   const editErrorId = `todo-edit-error-${todo.id}`
+
+  useEffect(() => () => onReleaseOwner?.(failureOwner), [failureOwner, onReleaseOwner])
 
   useEffect(() => {
     if (wasEditing.current && !isEditing) {
@@ -62,7 +66,7 @@ export function TodoItem({
     if (clearStandingFailure) onClearFailure?.(failureOwner)
     setToggling(true)
     try {
-      await onToggle(todo)
+      await onToggle(todo, failureOwner)
     } catch (failure) {
       onFailure?.(failureOwner, failure, () => runToggle(false))
       throw failure
@@ -81,7 +85,7 @@ export function TodoItem({
     setEditError(null)
     setSaving(true)
     try {
-      await onSaveEdit(description)
+      await onSaveEdit(description, failureOwner)
     } catch (failure) {
       onFailure?.(failureOwner, failure, () => runEdit(description, false))
       throw failure

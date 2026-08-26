@@ -1,12 +1,43 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { NotFoundError } from '../errors/AppError'
+import { ConflictError, NotFoundError } from '../errors/AppError'
 import { todoRepository } from '../repositories/todo.repository'
 import { todoService } from '../services/todo.service'
 import type { Todo } from '../types/todo'
 
 afterEach(() => {
   vi.restoreAllMocks()
+})
+
+describe('todoService.create', () => {
+  it('returns the idempotently created Todo', async () => {
+    const created: Todo = {
+      id: '00000000-0000-4000-8000-000000000000',
+      description: 'Created task',
+      completed: false,
+      createdAt: '2026-08-26T08:00:00.000Z',
+    }
+    const create = vi.spyOn(todoRepository, 'create').mockResolvedValueOnce(created)
+    const key = '10000000-0000-4000-8000-000000000000'
+
+    await expect(todoService.create({ description: created.description }, key)).resolves.toBe(
+      created,
+    )
+    expect(create).toHaveBeenCalledWith({ description: created.description }, key)
+  })
+
+  it('rejects reuse of an idempotency key for another payload', async () => {
+    vi.spyOn(todoRepository, 'create').mockResolvedValueOnce(null)
+
+    await expect(
+      todoService.create(
+        { description: 'Different task' },
+        '10000000-0000-4000-8000-000000000000',
+      ),
+    ).rejects.toEqual(
+      new ConflictError('Idempotency key was already used for a different create'),
+    )
+  })
 })
 
 describe('todoService.update', () => {

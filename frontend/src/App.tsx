@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AddTodoForm } from './components/AddTodoForm'
 import { EmptyState } from './components/EmptyState'
 import { ErrorBanner } from './components/ErrorBanner'
@@ -20,12 +20,15 @@ function App() {
     retry,
     registerFailure,
     clearFailure,
+    releaseOwner,
     addTodo,
     toggleTodo,
     editTodo,
     removeTodo,
   } = useTodos()
   const [addFocusRequest, setAddFocusRequest] = useState(0)
+  const [retryFocusId, setRetryFocusId] = useState<number | null>(null)
+  const retryWasPending = useRef(false)
 
   useEffect(() => {
     if (!announcement) return
@@ -33,11 +36,24 @@ function App() {
     return () => window.clearTimeout(timer)
   }, [announcement, announcementId, dismissAnnouncement])
 
+  useEffect(() => {
+    if (retryWasPending.current && !retrying && errorMessage && errorId !== null) {
+      setRetryFocusId(errorId)
+    }
+    retryWasPending.current = retrying
+  }, [errorId, errorMessage, retrying])
+
   return (
     <main className="app-shell" aria-busy={loading || retrying}>
       {loadFailed && errorMessage ? (
         <>
-          <ErrorBanner key={errorId} message={errorMessage} retrying={retrying} onRetry={retry} />
+          <ErrorBanner
+            key={errorId}
+            message={errorMessage}
+            retrying={retrying}
+            onRetry={retry}
+            focusRetry={retryFocusId === errorId}
+          />
           {loading ? <LoadingSkeleton /> : null}
         </>
       ) : loading ? (
@@ -48,10 +64,17 @@ function App() {
             onAdd={addTodo}
             onFailure={registerFailure}
             onClearFailure={clearFailure}
+            onReleaseOwner={releaseOwner}
             focusRequest={addFocusRequest}
           />
           {errorMessage ? (
-            <ErrorBanner key={errorId} message={errorMessage} retrying={retrying} onRetry={retry} />
+            <ErrorBanner
+              key={errorId}
+              message={errorMessage}
+              retrying={retrying}
+              onRetry={retry}
+              focusRetry={retryFocusId === errorId}
+            />
           ) : null}
           {list.length === 0 ? (
             <EmptyState />
@@ -63,6 +86,7 @@ function App() {
               onDelete={removeTodo}
               onFailure={registerFailure}
               onClearFailure={clearFailure}
+              onReleaseOwner={releaseOwner}
               onFocusAdd={() => setAddFocusRequest((request) => request + 1)}
             />
           )}

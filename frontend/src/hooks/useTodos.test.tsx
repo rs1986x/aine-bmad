@@ -273,6 +273,47 @@ describe('useTodos', () => {
     expect(result.current.error).toBeNull()
   })
 
+  it('never announces pending, failed, timed-out, or owner-aborted mutations', async () => {
+    const todo: Todo = {
+      id: '00000000-0000-4000-8000-000000000010',
+      description: 'Stay silent',
+      completed: false,
+      createdAt: '2026-06-17T00:00:00Z',
+    }
+    vi.spyOn(api, 'getTodos').mockResolvedValue([todo])
+    const update = vi
+      .spyOn(api, 'updateTodo')
+      .mockImplementationOnce((_id, _input, signal) => {
+        return new Promise<Todo>((_resolve, reject) => {
+          signal?.addEventListener('abort', () => {
+            reject(new ApiError('aborted', 'Request aborted', 0))
+          })
+        })
+      })
+      .mockRejectedValueOnce(new ApiError('internal', 'failed', 500))
+      .mockRejectedValueOnce(new ApiError('timeout', 'Request timed out', 0))
+    const owner = Symbol('todo-owner')
+    const { result } = renderHook(() => useTodos())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    const pending = result.current.toggleTodo(todo, owner)
+    expect(result.current.announcement).toBe('')
+    act(() => result.current.releaseOwner(owner))
+    await expect(pending).rejects.toEqual(new ApiError('aborted', 'Request superseded', 0))
+    expect(result.current.announcement).toBe('')
+
+    await expect(result.current.toggleTodo(todo)).rejects.toEqual(
+      new ApiError('internal', 'failed', 500),
+    )
+    expect(result.current.announcement).toBe('')
+
+    await expect(result.current.toggleTodo(todo)).rejects.toEqual(
+      new ApiError('timeout', 'Request timed out', 0),
+    )
+    expect(result.current.announcement).toBe('')
+    expect(update).toHaveBeenCalledTimes(3)
+  })
+
   it('announces each confirmed list change with exact polite copy', async () => {
     const existing: Todo = {
       id: '1',
@@ -441,6 +482,47 @@ describe('useTodos', () => {
     unmount()
 
     expect(mutationSignal?.aborted).toBe(true)
+  })
+
+  it('aborts the initial load when unmounted', async () => {
+    let loadSignal: AbortSignal | undefined
+    vi.spyOn(api, 'getTodos').mockImplementation((signal) => {
+      loadSignal = signal
+      return new Promise<Todo[]>(() => {})
+    })
+    const { unmount } = renderHook(() => useTodos())
+    await waitFor(() => expect(loadSignal).toBeDefined())
+
+    unmount()
+
+    expect(loadSignal?.aborted).toBe(true)
+  })
+
+  it('aborts owner-scoped work and removes its queued failure when released', async () => {
+    vi.spyOn(api, 'getTodos').mockResolvedValue([])
+    let mutationSignal: AbortSignal | undefined
+    vi.spyOn(api, 'createTodo').mockImplementation((_input, signal) => {
+      mutationSignal = signal
+      return new Promise<Todo>(() => {})
+    })
+    const owner = Symbol('owner')
+    const { result } = renderHook(() => useTodos())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    void result.current.addTodo('Pending', owner)
+    await waitFor(() => expect(mutationSignal).toBeDefined())
+    act(() => {
+      result.current.registerFailure(
+        owner,
+        new ApiError('internal', 'stale', 500),
+        vi.fn().mockResolvedValue(undefined),
+      )
+    })
+    expect(result.current.errorMessage).not.toBeNull()
+
+    act(() => result.current.releaseOwner(owner))
+
+    expect(mutationSignal?.aborted).toBe(true)
+    expect(result.current.errorMessage).toBeNull()
   })
 
   it('classifies connection failures and makes Retry duplicate-safe', async () => {
@@ -678,7 +760,29 @@ describe('useTodos', () => {
     expect(result.current.list).toEqual([updated, created, unaffected])
   })
 
-  it('does not announce an update that cannot reconcile into the list', async () => {
+  it('treats a 404 delete response as confirmed absence', async () => {
+    const todo: Todo = {
+      id: '00000000-0000-4000-8000-000000000011',
+      description: 'Already deleted remotely',
+      completed: false,
+      createdAt: '2026-06-17T00:00:00Z',
+    }
+    vi.spyOn(api, 'getTodos').mockResolvedValue([todo])
+    vi.spyOn(api, 'deleteTodo').mockRejectedValue(
+      new ApiError('NOT_FOUND', 'Todo not found', 404),
+    )
+    const { result } = renderHook(() => useTodos())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    await act(async () => {
+      await result.current.removeTodo(todo.id, todo.description)
+    })
+
+    expect(result.current.list).toEqual([])
+    expect(result.current.announcement).toBe(`Todo deleted: ${todo.description}.`)
+  })
+
+  it('commits and announces an update confirmed after an older list removed its item', async () => {
     const missing: Todo = {
       id: 'missing',
       description: 'Missing',
@@ -694,7 +798,7 @@ describe('useTodos', () => {
       await result.current.toggleTodo({ ...missing, completed: false })
     })
 
-    expect(result.current.list).toEqual([])
-    expect(result.current.announcement).toBe('')
+    expect(result.current.list).toEqual([missing])
+    expect(result.current.announcement).toBe('Todo completed: Missing.')
   })
 })
