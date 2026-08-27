@@ -20,7 +20,9 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'html', 'lcov'],
       include: ['src/**'],
-      exclude: ['src/main.tsx'],
+      // Only the bootstrap is excluded from the gate. The rest are non-source
+      // files that `src/**` sweeps in as zero-line noise in the HTML report.
+      exclude: ['src/main.tsx', '**/.gitkeep', '**/*.css'],
       reportOnFailure: true,
       thresholds: {
         lines: 70,

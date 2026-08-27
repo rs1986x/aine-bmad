@@ -44,10 +44,18 @@ test('shows an alert and preserves typed create text when the backend is down', 
     const alert = page.getByRole('alert')
     await expect(alert).toBeVisible({ timeout: 15_000 })
     await expect(page.getByRole('button', { name: 'Retry' })).toBeVisible()
-    await expect(alert).toContainText(/Couldn't (save that change|connect)/)
+    // nginx answers a stopped upstream with 502, so the client classifies this
+    // as a failed save, not a connection error. Asserting the exact copy keeps
+    // the test honest if that classification ever changes.
+    await expect(alert).toContainText("Couldn't save that change.")
     await expect(input).toHaveValue(description)
     await expect(todoItem(page, description)).toHaveCount(0)
   } finally {
     await restoreBackendHealth()
   }
+
+  await page.getByRole('button', { name: 'Retry' }).click()
+  await expect(todoItem(page, description)).toBeVisible()
+  await expect(input).toHaveValue('')
+  await expect(page.getByRole('alert')).toHaveCount(0)
 })

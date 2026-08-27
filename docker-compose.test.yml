@@ -2,6 +2,13 @@
 # Provides a fresh Postgres that CI and local test runs bring up on demand.
 # Later stories add fresh-migrate + truncate-between-tests behavior; here it
 # just needs to come up and be reachable.
+#
+# The explicit project name keeps this stack separate from the production
+# compose project. Both files define a service called `db`, so without it both
+# resolve to the directory-derived project `aine-bmad` and bringing this one up
+# recreates the production `db` container with the tmpfs mount below.
+name: aine-bmad-test
+
 services:
   db:
     image: postgres:18.4

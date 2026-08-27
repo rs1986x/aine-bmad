@@ -3,7 +3,7 @@ title: 'Story 3.1: Real-stack E2E suite and 70% coverage gate'
 type: 'feature'
 created: '2026-08-27'
 status: 'done'
-review_loop_iteration: 0
+review_loop_iteration: 1
 baseline_commit: '73a80d3a2840b04082fbde22dc229355c038c2a2'
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-3-context.md'
@@ -64,9 +64,41 @@ context:
 - Given a CI run whether successful or failed, when evidence is collected, then available Playwright HTML and frontend/backend HTML/lcov coverage reports are uploaded, with Compose diagnostics retained on E2E failure.
 - Given the implementation diff, when reviewed, then added coverage exercises meaningful application logic and production behavior has not been weakened or distorted for testing.
 
+### Review Findings
+
+- [x] [Review][Decision] No browser-session persistence test — resolved: added `keeps a todo created in an earlier browser session` to `crud.spec.ts`, which opens a fresh `browser.newContext()` (no shared cookies or storage) and asserts the todo comes back from the server. The suite is now 8 tests.
+- [x] [Review][Decision] Spec status contradicts sprint tracking — resolved: `sprint-status.yaml` is authoritative and this review sets the final status in both files.
+- [x] [Review][Patch] Test compose file collides with the production stack on project name [docker-compose.test.yml:10]
+- [x] [Review][Patch] Backend-down E2E assertion uses an alternation that passes for the wrong failure class [e2e/tests/stack.spec.ts:47]
+- [x] [Review][Patch] Coverage artifact upload uses `if-no-files-found: warn`, so the evidence AC can silently regress [.github/workflows/ci.yml:45]
+- [x] [Review][Patch] Coverage artifact `path` lists two files already inside the directory it also uploads [.github/workflows/ci.yml:42]
+- [x] [Review][Patch] README is stale and missing the new local workflow (Playwright run, coverage gate, Docker note) [README.md:23]
+- [x] [Review][Patch] `db-data` remount silently orphans pre-existing local volumes with no migration note [README.md:23]
+- [x] [Review][Patch] A failing `restoreBackendHealth()` masks the real assertion error and leaves the backend stopped [e2e/support/compose.ts:76]
+- [x] [Review][Patch] `compose()` discards stderr, so a Docker failure surfaces as a bare exit code [e2e/support/compose.ts:17]
+- [x] [Review][Patch] E2E runs accumulate rows in the persistent local database with no reset path [e2e/support/global-teardown.ts:1]
+- [x] [Review][Patch] E2E job has no `timeout-minutes` despite building images and controlling containers [.github/workflows/ci.yml:93]
+- [x] [Review][Patch] Compose logs are printed to the job log but never uploaded as evidence [.github/workflows/ci.yml:139]
+- [x] [Review][Patch] Retry control is asserted visible but never exercised [e2e/tests/stack.spec.ts:54]
+- [x] [Review][Patch] Coverage report includes `.gitkeep` and CSS files as zero-line noise [frontend/vite.config.ts:22]
+- [x] [Review][Patch] Spec Change Log records only one of the two `docker-compose.yml` edits [docker-compose.yml:68]
+- [x] [Review][Defer] `workers: 1` serialises the whole suite, broader than the spec's "serialise infra-mutating tests" [e2e/playwright.config.ts:7] — deferred, pre-existing
+- [x] [Review][Defer] Playwright retries twice in CI but `globalSetup` health-gates only once per run [e2e/playwright.config.ts:9] — deferred, pre-existing
+- [x] [Review][Defer] Backend container healthcheck still probes `localhost` while the frontend one moved to `127.0.0.1` [docker-compose.yml:47] — deferred, pre-existing
+- [x] [Review][Defer] Stack origin is hardcoded in three places with no `E2E_BASE_URL` override [e2e/support/compose.ts:7] — deferred, pre-existing
+- [x] [Review][Defer] Deleting the smoke test removed the app-independent harness signal [e2e/tests/smoke.spec.ts:1] — deferred, pre-existing
+- [x] [Review][Defer] `onFocusAdd` test asserts only that the callback fired [frontend/src/components/TodoList.test.tsx:344] — deferred, pre-existing
+- [x] [Review][Defer] Minor uncovered `errorHandler` branches: `statusCode` fallback and a 5xx `status` [backend/src/middleware/errorHandler.ts:11] — deferred, pre-existing
+- [x] [Review][Defer] 404 test covers only `GET` on an `/api` path [backend/src/__tests__/todo.api.test.ts:49] — deferred, pre-existing
+- [x] [Review][Defer] Abort test can hang until the Vitest timeout instead of failing fast [frontend/src/api/api.test.ts:368] — deferred, pre-existing
+- [x] [Review][Defer] nginx resolves the `backend` upstream once at config load [frontend/nginx.conf:14] — deferred, pre-existing
+- [x] [Review][Defer] Named-volume durability is still not proven by any test [docker-compose.yml:19] — deferred, pre-existing
+
 ## Spec Change Log
 
 - 2026-08-27: Production `db-data` volume now mounts at `/var/lib/postgresql`. Postgres 18.4 rejects `/var/lib/postgresql/data` as an unused mount, so the named volume, services, and host port are unchanged but the mount parent matches `docker-compose.test.yml`.
+- 2026-08-27: The `frontend` healthcheck probes `http://127.0.0.1/` instead of `http://localhost/`. busybox `wget` does not fall back across address families, so an IPv6-first `localhost` made `docker compose up --wait` fail against a healthy nginx. The `backend` probe is unchanged because Node's `autoSelectFamily` already handles it.
+- 2026-08-27 (code review): `docker-compose.test.yml` declares `name: aine-bmad-test`. Both compose files define a service called `db` and previously shared the directory-derived project `aine-bmad`, so bringing the test database up recreated the production `db` container with a tmpfs mount.
 
 ## Design Notes
 

@@ -20,6 +20,7 @@ jobs:
   frontend:
     name: Frontend (lint + typecheck + coverage)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: frontend
@@ -39,16 +40,16 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: frontend-coverage
-          path: |
-            frontend/coverage/index.html
-            frontend/coverage/lcov.info
-            frontend/coverage/
+          path: frontend/coverage/
           retention-days: 7
-          if-no-files-found: warn
+          # The coverage report is the evidence this job exists to produce, so a
+          # missing directory is a broken config, not an acceptable no-op.
+          if-no-files-found: error
 
   backend:
     name: Backend (lint + typecheck + coverage)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: backend
@@ -79,12 +80,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: backend-coverage
-          path: |
-            backend/coverage/index.html
-            backend/coverage/lcov.info
-            backend/coverage/
+          path: backend/coverage/
           retention-days: 7
-          if-no-files-found: warn
+          if-no-files-found: error
       - name: Stop ephemeral test Postgres
         if: always()
         working-directory: .
@@ -93,6 +91,9 @@ jobs:
   e2e:
     name: E2E (Playwright)
     runs-on: ubuntu-latest
+    # This job builds images, health-gates a stack, and stops/starts containers
+    # from inside the tests, so cap it rather than fall back to the 6h default.
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: e2e
@@ -125,10 +126,10 @@ jobs:
           echo "timed out waiting for /api/health"
           exit 1
       - run: npm test
-      - name: Dump compose logs on failure
+      - name: Capture compose logs on failure
         if: failure()
         working-directory: .
-        run: docker compose logs
+        run: docker compose logs --no-color | tee compose-logs.txt
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v4
@@ -136,6 +137,14 @@ jobs:
           name: playwright-report
           path: e2e/playwright-report/
           retention-days: 7
+      - name: Upload compose logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-compose-logs
+          path: compose-logs.txt
+          retention-days: 7
+          if-no-files-found: warn
       - name: Tear down the stack
         if: always()
         working-directory: .
@@ -144,6 +153,7 @@ jobs:
   compose-smoke:
     name: Compose smoke (one-command bring-up)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     # Independent of the frontend/backend/e2e jobs: this proves the PRODUCTION
     # docker-compose.yml stack builds, comes up health-gated, serves the SPA, and
     # reverse-proxies /api through nginx. It must fail the build on any failure.

@@ -72,3 +72,21 @@ test('keeps a created and edited todo after browser reload', async ({ page }) =>
   await expect(todoItem(page, updated)).toBeVisible()
   await expect(todoItem(page, original)).toHaveCount(0)
 })
+
+test('keeps a todo created in an earlier browser session', async ({ page, browser }) => {
+  const description = uniqueTodo('session')
+
+  await addTodo(page, description)
+
+  // A fresh context shares no cookies or storage with the page above, so seeing
+  // the todo proves it came back from the server rather than the client.
+  const context = await browser.newContext({ baseURL: test.info().project.use.baseURL })
+  try {
+    const secondSession = await context.newPage()
+    await secondSession.goto('/')
+    await expect(addInput(secondSession)).toBeVisible()
+    await expect(todoItem(secondSession, description)).toBeVisible()
+  } finally {
+    await context.close()
+  }
+})

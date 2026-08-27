@@ -1,5 +1,5 @@
 # generated: 2026-06-16
-# last_updated: 2026-08-27 (story 3-1 → review)
+# last_updated: 2026-08-27 (story 3-1 → done, code review passed)
 # project: aine-bmad
 # project_key: NOKEY
 # tracking_system: file-system
@@ -69,7 +69,7 @@ development_status:
   # >=5 Playwright E2E + >=70% coverage gate in CI, WCAG 2.1 AA audit (zero critical),
   # security review of baseline hardening.
   epic-3: in-progress
-  3-1-e2e-suite-5-playwright-coverage-gate-70: review
+  3-1-e2e-suite-5-playwright-coverage-gate-70: done
   3-2-accessibility-audit-zero-critical-wcag-2-1-aa-violations: backlog
   3-3-security-review-of-baseline-hardening: backlog
   epic-3-retrospective: optional

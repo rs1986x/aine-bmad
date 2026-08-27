@@ -8,7 +8,7 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'html', 'lcov'],
       include: ['src/**'],
-      exclude: ['src/index.ts'],
+      exclude: ['src/index.ts', '**/.gitkeep'],
       reportOnFailure: true,
       thresholds: {
         lines: 70,

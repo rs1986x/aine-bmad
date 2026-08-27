@@ -5,7 +5,8 @@ import { promisify } from 'node:util'
 
 const execFileAsync = promisify(execFile)
 const composeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
-const healthUrl = 'http://localhost:8080/api/health'
+const apiBase = 'http://localhost:8080/api'
+const healthUrl = `${apiBase}/health`
 const pollIntervalMs = 250
 
 async function delay(ms: number): Promise<void> {
@@ -13,11 +14,19 @@ async function delay(ms: number): Promise<void> {
 }
 
 async function compose(args: string[]): Promise<void> {
-  await execFileAsync('docker', ['compose', ...args], {
-    cwd: composeRoot,
-    maxBuffer: 10 * 1024 * 1024,
-    timeout: 90_000,
-  })
+  try {
+    await execFileAsync('docker', ['compose', ...args], {
+      cwd: composeRoot,
+      maxBuffer: 10 * 1024 * 1024,
+      timeout: 90_000,
+    })
+  } catch (error) {
+    // execFile rejections carry the captured output on the error object; without
+    // this the only diagnostic is an exit code, which is useless in CI.
+    const { stderr, stdout } = error as { stderr?: string; stdout?: string }
+    const output = stderr?.trim() || stdout?.trim() || String(error)
+    throw new Error(`docker compose ${args.join(' ')} failed: ${output}`, { cause: error })
+  }
 }
 
 async function readHealth(): Promise<{ ok: boolean; status?: string; db?: string }> {
@@ -73,6 +82,38 @@ export async function restartBackend(): Promise<void> {
   await waitForApiHealth()
 }
 
+// Called from `finally` blocks, so it must never throw: rethrowing here would
+// replace the assertion failure that actually explains the run. It escalates
+// from `start` to a full recreate, then gives up loudly and lets globalTeardown
+// report the stack as unusable.
 export async function restoreBackendHealth(): Promise<void> {
-  await startBackend()
+  try {
+    await startBackend()
+    return
+  } catch (error) {
+    console.error('[e2e] `docker compose start backend` did not restore health:', error)
+  }
+
+  try {
+    await compose(['up', '-d', '--wait', 'backend'])
+    await waitForApiHealth()
+  } catch (error) {
+    console.error('[e2e] backend could not be restored; later tests will fail:', error)
+  }
+}
+
+// Removes only the todos this suite created, identified by the `e2e ` prefix
+// that `uniqueTodo` stamps on every description. The production stack keeps a
+// named volume, so without this a repeated local run accumulates rows forever.
+export async function cleanupE2eTodos(): Promise<void> {
+  const response = await fetch(`${apiBase}/todos`, { signal: AbortSignal.timeout(10_000) })
+  if (!response.ok) throw new Error(`Could not list todos for cleanup: ${response.status}`)
+  const todos = (await response.json()) as { id: string; description: string }[]
+
+  for (const todo of todos.filter((todo) => todo.description.startsWith('e2e '))) {
+    await fetch(`${apiBase}/todos/${encodeURIComponent(todo.id)}`, {
+      method: 'DELETE',
+      signal: AbortSignal.timeout(10_000),
+    })
+  }
 }

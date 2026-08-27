@@ -20,6 +20,42 @@ reverse-proxies `/api/*` to the backend, so everything is one origin.
 Stop the stack with `docker compose down`. To also wipe the database volume
 (`db-data`), use `docker compose down -v`.
 
+> **Upgrading an existing checkout:** the `db-data` volume now mounts at
+> `/var/lib/postgresql` instead of `/var/lib/postgresql/data`, because
+> postgres 18 keeps its data in a major-version subdirectory. A volume created
+> before this change holds its data at the old location, where the new container
+> will not look for it, so the app comes up empty. Run `docker compose down -v`
+> once to recreate the volume.
+
+## Running the tests locally
+
+Each package has its own suite. `npm test` runs the tests; `npm run test:coverage`
+runs them with coverage and **fails below 70%** on lines, functions, branches,
+and statements — the same gate CI enforces. Reports land in `<package>/coverage/`
+(open `index.html`; `lcov.info` is there for tooling).
+
+```bash
+cd frontend && npm run test:coverage
+cd backend  && npm run test:coverage   # needs the test database, see below
+```
+
+### End-to-end tests (Playwright)
+
+The E2E suite drives a real browser against the running production stack and
+controls containers itself (it stops and restarts the `backend` service to prove
+persistence and failure handling), so Docker must be running and the stack must
+be up first:
+
+```bash
+docker compose up -d --build --wait
+cd e2e && npm test
+```
+
+The tests talk to `http://localhost:8080` only, and every todo they create is
+prefixed `e2e `. Playwright's teardown restores the backend and deletes those
+rows, so repeated runs do not accumulate data in the persistent volume. To reset
+completely, use `docker compose down -v`.
+
 ## Running the backend integration tests locally
 
 The backend integration tests (`backend/src/__tests__/todo.api.test.ts`) run
@@ -48,7 +84,7 @@ database automatically. To run them locally:
    docker compose -f docker-compose.test.yml down -v
    ```
 
-> Note: Docker is not installed on the current dev machine, so these integration
-> tests are proven by CI rather than locally. The DB-free tests
-> (`src/config/env.test.ts`, `src/__tests__/errorHandler.test.ts`) run anywhere
-> via `npm test`.
+This stack declares its own compose project name (`aine-bmad-test`), so it is
+safe to run alongside the production stack even though both define a service
+called `db`. The DB-free tests (`src/config/env.test.ts`,
+`src/__tests__/errorHandler.test.ts`) run anywhere via `npm test`.
