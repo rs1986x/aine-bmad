@@ -3,7 +3,7 @@
 export function EmptyState() {
   return (
     <div className="empty-state">
-      <h1 className="empty-state__headline">No todos yet.</h1>
+      <h2 className="empty-state__headline">No todos yet.</h2>
       <p className="empty-state__subline">Add your first one above.</p>
     </div>
   )

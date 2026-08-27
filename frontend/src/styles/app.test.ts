@@ -82,3 +82,10 @@ describe('Story 2.5 reliability styles', () => {
     )
   })
 })
+
+describe('Story 3.2 accessibility styles', () => {
+  it('holds the add-submit and Retry buttons to the same 44px floor as every other control', () => {
+    expect(css).toMatch(/\.add-todo-form__submit\s*\{[^}]*min-height:\s*44px;/s)
+    expect(css).toMatch(/\.error-banner__retry\s*\{[^}]*min-height:\s*44px;/s)
+  })
+})

@@ -140,7 +140,9 @@ export function TodoItem({
           onKeyDown={handleCheckboxKeyDown}
           disabled={isEditing || toggling}
           aria-busy={toggling}
-          aria-label={completed ? 'Completed' : 'Not completed'}
+          // Named for the todo, not the state: `checked` already carries
+          // completion, and a state-based name reads identically on every row.
+          aria-label={description}
         />
       </label>
       {isEditing ? (
@@ -198,7 +200,7 @@ export function TodoItem({
           ref={editButtonRef}
           type="button"
           className="todo-item__action"
-          aria-label="Edit todo"
+          aria-label={`Edit todo: ${description}`}
           onClick={() => {
             setDraft(description)
             setEditError(null)
@@ -226,7 +228,7 @@ export function TodoItem({
           ref={deleteButtonRef}
           type="button"
           className="todo-item__action"
-          aria-label="Delete todo"
+          aria-label={`Delete todo: ${description}`}
           data-todo-delete-id={todo.id}
           onClick={() => {
             if (deleteButtonRef.current) {

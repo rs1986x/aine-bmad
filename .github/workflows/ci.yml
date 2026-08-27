@@ -137,6 +137,16 @@ jobs:
           name: playwright-report
           path: e2e/playwright-report/
           retention-days: 7
+      - name: Upload axe accessibility results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: axe-results
+          path: e2e/axe-results/
+          retention-days: 7
+          # Per-state axe JSON is the accessibility gate's evidence; if it is
+          # missing the scan never ran, which is a broken job, not a clean pass.
+          if-no-files-found: error
       - name: Upload compose logs
         if: failure()
         uses: actions/upload-artifact@v4

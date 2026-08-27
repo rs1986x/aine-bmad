@@ -278,7 +278,7 @@ describe('App loading → empty transition', () => {
       .mockResolvedValueOnce(updated)
     render(<App />)
     const row = await screen.findByRole('listitem', { name: todo.description })
-    await user.click(within(row).getByRole('button', { name: 'Edit todo' }))
+    await user.click(within(row).getByRole('button', { name: `Edit todo: ${todo.description}` }))
     const input = screen.getByLabelText(`Edit description for ${todo.description}`)
     await user.clear(input)
     await user.type(input, updated.description)
@@ -315,7 +315,11 @@ describe('App loading → empty transition', () => {
     render(<App />)
     const item = await screen.findByRole('listitem', { name: 'Delete through App' })
 
-    await user.click(item.querySelector<HTMLButtonElement>('button[aria-label="Delete todo"]')!)
+    await user.click(
+      item.querySelector<HTMLButtonElement>(
+        `button[aria-label="Delete todo: ${todo.description}"]`,
+      )!,
+    )
     expect(item).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Delete' }))
 
@@ -351,7 +355,9 @@ describe('App loading → empty transition', () => {
     render(<App />)
     const targetRow = await screen.findByRole('listitem', { name: target.description })
 
-    await user.click(within(targetRow).getByRole('button', { name: 'Delete todo' }))
+    await user.click(
+      within(targetRow).getByRole('button', { name: `Delete todo: ${target.description}` }),
+    )
     await user.click(screen.getByRole('button', { name: 'Delete' }))
 
     expect(remove).toHaveBeenCalledWith(target.id, expect.any(AbortSignal))
@@ -363,7 +369,9 @@ describe('App loading → empty transition', () => {
     const siblingRow = screen.getByRole('listitem', { name: sibling.description })
     expect(siblingRow).toBeInTheDocument()
     await waitFor(() =>
-      expect(within(siblingRow).getByRole('button', { name: 'Delete todo' })).toHaveFocus(),
+      expect(
+        within(siblingRow).getByRole('button', { name: `Delete todo: ${sibling.description}` }),
+      ).toHaveFocus(),
     )
   })
 
@@ -394,5 +402,64 @@ describe('App loading → empty transition', () => {
     expect(
       await screen.findByText('Todo completed: Second announcement.', {}, { timeout: 2_000 }),
     ).toBeInTheDocument()
+  })
+})
+
+describe('App heading outline', () => {
+  const outline = () => screen.getAllByRole('heading').map((h) => Number(h.tagName.slice(1)))
+
+  beforeEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('keeps one top-level heading through loading and into the empty state', async () => {
+    let resolveTodos: (todos: never[]) => void = () => {}
+    vi.spyOn(api, 'getTodos').mockReturnValue(
+      new Promise<never[]>((resolve) => {
+        resolveTodos = resolve
+      }),
+    )
+
+    render(<App />)
+
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Todo')
+    expect(outline()).toEqual([1])
+
+    resolveTodos([])
+
+    expect(await screen.findByText('No todos yet.')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Todo')
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('No todos yet.')
+    expect(outline()).toEqual([1, 2])
+  })
+
+  it('keeps the top-level heading when the initial load fails', async () => {
+    vi.spyOn(api, 'getTodos').mockRejectedValue(new api.ApiError('internal', 'boom', 500))
+
+    render(<App />)
+
+    await screen.findByRole('alert')
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Todo')
+    expect(outline()).toEqual([1])
+  })
+
+  it('keeps the top-level heading as the only heading with a populated list', async () => {
+    const todo: Todo = {
+      id: '00000000-0000-4000-8000-000000000030',
+      description: 'Outlined todo',
+      completed: false,
+      createdAt: '2026-08-26T08:00:00.000Z',
+    }
+    vi.spyOn(api, 'getTodos').mockResolvedValue([todo])
+
+    render(<App />)
+
+    expect(await screen.findByRole('listitem', { name: todo.description })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Todo')
+    expect(outline()).toEqual([1])
   })
 })

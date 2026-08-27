@@ -1,7 +1,25 @@
-import { expect, type Locator, type Page } from '@playwright/test'
+import { expect, type Locator, type Page, type Route } from '@playwright/test'
+
+export const TODOS_ROUTE = '**/api/todos'
 
 export function uniqueTodo(label: string): string {
   return `e2e ${label} ${crypto.randomUUID()}`
+}
+
+// Intercepts only the collection GET. `/api/todos/:id` mutations and every other
+// request still reach the real backend, so a routed test stays as close to the
+// running stack as the state under test allows.
+export async function interceptTodoList(
+  page: Page,
+  handle: (route: Route) => Promise<void>,
+): Promise<void> {
+  await page.route(TODOS_ROUTE, async (route) => {
+    if (route.request().method() !== 'GET') {
+      await route.continue()
+      return
+    }
+    await handle(route)
+  })
 }
 
 export function addInput(page: Page): Locator {
@@ -11,6 +29,29 @@ export function addInput(page: Page): Locator {
 export function todoItem(page: Page, description: string, completed = false): Locator {
   return page.getByRole('listitem', {
     name: completed ? `Completed: ${description}` : description,
+    exact: true,
+  })
+}
+
+// Row controls are named after the todo they act on, so each locator is pinned
+// with `exact` — a substring match would defeat the point of the per-row names.
+export function rowCheckbox(page: Page, description: string, completed = false): Locator {
+  return todoItem(page, description, completed).getByRole('checkbox', {
+    name: description,
+    exact: true,
+  })
+}
+
+export function editButton(page: Page, description: string, completed = false): Locator {
+  return todoItem(page, description, completed).getByRole('button', {
+    name: `Edit todo: ${description}`,
+    exact: true,
+  })
+}
+
+export function deleteButton(page: Page, description: string, completed = false): Locator {
+  return todoItem(page, description, completed).getByRole('button', {
+    name: `Delete todo: ${description}`,
     exact: true,
   })
 }
@@ -33,21 +74,19 @@ export async function toggleTodo(
   description: string,
   completed: boolean,
 ): Promise<void> {
-  const item = todoItem(page, description, completed)
-  await item.getByRole('checkbox', { name: completed ? 'Completed' : 'Not completed' }).click()
+  await rowCheckbox(page, description, completed).click()
   await expect(todoItem(page, description, !completed)).toBeVisible()
 }
 
 export async function editTodo(page: Page, from: string, to: string): Promise<void> {
-  const item = todoItem(page, from)
-  await item.getByRole('button', { name: 'Edit todo' }).click()
+  await editButton(page, from).click()
   await page.getByRole('textbox', { name: `Edit description for ${from}` }).fill(to)
   await page.getByRole('button', { name: 'Save' }).click()
   await expect(todoItem(page, to)).toBeVisible()
 }
 
 export async function deleteTodo(page: Page, description: string): Promise<void> {
-  await todoItem(page, description).getByRole('button', { name: 'Delete todo' }).click()
+  await deleteButton(page, description).click()
   const dialog = page.getByRole('dialog', { name: 'Delete this todo?' })
   await expect(dialog).toBeVisible()
   await dialog.getByRole('button', { name: 'Delete' }).click()

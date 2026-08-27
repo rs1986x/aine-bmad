@@ -121,6 +121,7 @@ select {
   color: var(--button-primary-fg);
   border: none;
   border-radius: var(--button-primary-radius);
+  min-height: 44px;
   padding: var(--button-primary-padding);
   cursor: pointer;
 }
@@ -197,6 +198,7 @@ select {
   color: var(--button-primary-fg);
   border: none;
   border-radius: var(--button-primary-radius);
+  min-height: 44px;
   padding: var(--button-primary-padding);
   cursor: pointer;
 }

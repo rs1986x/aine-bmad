@@ -45,6 +45,9 @@ function App() {
 
   return (
     <main className="app-shell" aria-busy={loading || retrying}>
+      {/* Above the mutually exclusive branches so the outline keeps a top-level
+          heading in every state. Hidden visually: the design has no page title. */}
+      <h1 className="sr-only">Todo</h1>
       {loadFailed && errorMessage ? (
         <>
           <ErrorBanner

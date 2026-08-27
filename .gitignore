@@ -9,6 +9,7 @@ build/
 coverage/
 playwright-report/
 test-results/
+axe-results/
 
 # Environment files (never commit real secrets; .env.example IS committed)
 .env

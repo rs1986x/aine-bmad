@@ -59,7 +59,9 @@ describe('TodoItem', () => {
     const item = screen.getByRole('listitem', { name: 'Buy milk' })
     expect(item).toBeInTheDocument()
 
-    const checkbox = screen.getByRole('checkbox')
+    // The checkbox is named after its todo, not after its state — `checked`
+    // carries the state, so the name stays distinguishable between rows.
+    const checkbox = screen.getByRole('checkbox', { name: 'Buy milk' })
     expect(checkbox).not.toBeChecked()
 
     const desc = screen.getByText('Buy milk')
@@ -73,8 +75,8 @@ describe('TodoItem', () => {
     const item = screen.getByRole('listitem', { name: 'Completed: Walk the dog' })
     expect(item).toBeInTheDocument()
 
-    // Dual signal 2a: checkbox is checked.
-    expect(screen.getByRole('checkbox')).toBeChecked()
+    // Dual signal 2a: checkbox is checked, while its name still names the todo.
+    expect(screen.getByRole('checkbox', { name: 'Walk the dog' })).toBeChecked()
 
     // Dual signal 2b: description has the strike-through modifier class.
     const desc = screen.getByText('Walk the dog')
@@ -91,8 +93,8 @@ describe('TodoItem', () => {
   it('renders labeled edit and delete buttons', () => {
     renderItem(activeTodo)
 
-    const edit = screen.getByRole('button', { name: 'Edit todo' })
-    const del = screen.getByRole('button', { name: 'Delete todo' })
+    const edit = screen.getByRole('button', { name: 'Edit todo: Buy milk' })
+    const del = screen.getByRole('button', { name: 'Delete todo: Buy milk' })
 
     expect(edit).toBeInTheDocument()
     expect(del).toBeInTheDocument()
@@ -106,7 +108,7 @@ describe('TodoItem', () => {
     const user = userEvent.setup()
     const onRequestDelete = vi.fn()
     renderItem(activeTodo, { onRequestDelete })
-    const del = screen.getByRole('button', { name: 'Delete todo' })
+    const del = screen.getByRole('button', { name: 'Delete todo: Buy milk' })
 
     await user.click(del)
 
@@ -131,8 +133,8 @@ describe('TodoItem', () => {
     expect(checkbox).toBeDisabled()
     expect(checkbox).toHaveAttribute('aria-busy', 'true')
     expect(checkbox.closest('label')).toHaveClass('todo-item__checkbox-target--busy')
-    expect(screen.getByRole('button', { name: 'Edit todo' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Delete todo' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Edit todo: Buy milk' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Delete todo: Buy milk' })).toBeDisabled()
     await user.click(checkbox)
     expect(onToggle).toHaveBeenCalledOnce()
 
@@ -223,7 +225,7 @@ describe('TodoItem', () => {
     const checkbox = screen.getByRole('checkbox')
     expect(checkbox).toBeDisabled()
     expect(checkbox.closest('label')).toHaveClass('todo-item__checkbox-target--disabled')
-    expect(screen.getByRole('button', { name: 'Delete todo' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Delete todo: Buy milk' })).toBeDisabled()
   })
 
   it('trims a Save submission and debounces controls while pending', async () => {

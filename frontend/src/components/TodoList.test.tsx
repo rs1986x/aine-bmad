@@ -67,6 +67,28 @@ describe('TodoList', () => {
     ])
   })
 
+  it('gives every row control a name that identifies its own todo', () => {
+    renderList()
+
+    const names = [...screen.getAllByRole('checkbox'), ...screen.getAllByRole('button')].map(
+      (control) => control.getAttribute('aria-label'),
+    )
+    expect(names).toHaveLength(todos.length * 3)
+    expect(new Set(names).size).toBe(names.length)
+
+    // `getByRole` throws on more than one match, so each of these also proves the
+    // name resolves to exactly one control across the whole list.
+    for (const todo of todos) {
+      expect(screen.getByRole('checkbox', { name: todo.description })).toBeInTheDocument()
+      expect(
+        screen.getByRole('button', { name: `Edit todo: ${todo.description}` }),
+      ).toBeInTheDocument()
+      expect(
+        screen.getByRole('button', { name: `Delete todo: ${todo.description}` }),
+      ).toBeInTheDocument()
+    }
+  })
+
   it('forwards toggle actions without changing the prop-backed checkbox early', async () => {
     const user = userEvent.setup()
     const onToggle = vi.fn<(todo: Todo) => Promise<Todo>>()
@@ -85,13 +107,15 @@ describe('TodoList', () => {
     renderList()
     const activeNew = screen.getByRole('listitem', { name: 'active new' })
 
-    await user.click(within(activeNew).getByRole('button', { name: 'Edit todo' }))
+    await user.click(within(activeNew).getByRole('button', { name: 'Edit todo: active new' }))
 
     expect(screen.getAllByRole('textbox')).toHaveLength(1)
     expect(screen.getByLabelText('Edit description for active new')).toBeInTheDocument()
     const otherRow = screen.getByRole('listitem', { name: 'active old' })
-    expect(within(otherRow).getByRole('button', { name: 'Edit todo' })).toBeDisabled()
-    expect(within(activeNew).getByRole('button', { name: 'Delete todo' })).toBeDisabled()
+    expect(within(otherRow).getByRole('button', { name: 'Edit todo: active old' })).toBeDisabled()
+    expect(
+      within(activeNew).getByRole('button', { name: 'Delete todo: active new' }),
+    ).toBeDisabled()
   })
 
   it('forwards an edit and closes only after the confirmed response', async () => {
@@ -103,7 +127,7 @@ describe('TodoList', () => {
     const onEdit = vi.fn().mockReturnValue(pending)
     renderList(todos, undefined, onEdit)
     const activeNew = screen.getByRole('listitem', { name: 'active new' })
-    await user.click(within(activeNew).getByRole('button', { name: 'Edit todo' }))
+    await user.click(within(activeNew).getByRole('button', { name: 'Edit todo: active new' }))
     const input = screen.getByRole('textbox')
     await user.clear(input)
     await user.type(input, 'updated wording')
@@ -121,7 +145,7 @@ describe('TodoList', () => {
     const onEdit = vi.fn().mockRejectedValue(new Error('failed'))
     renderList(todos, undefined, onEdit)
     const activeNew = screen.getByRole('listitem', { name: 'active new' })
-    await user.click(within(activeNew).getByRole('button', { name: 'Edit todo' }))
+    await user.click(within(activeNew).getByRole('button', { name: 'Edit todo: active new' }))
 
     await user.click(screen.getByRole('button', { name: 'Save' }))
 
@@ -132,7 +156,7 @@ describe('TodoList', () => {
     const user = userEvent.setup()
     renderList()
     const activeNew = screen.getByRole('listitem', { name: 'active new' })
-    const edit = within(activeNew).getByRole('button', { name: 'Edit todo' })
+    const edit = within(activeNew).getByRole('button', { name: 'Edit todo: active new' })
     await user.click(edit)
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
@@ -150,7 +174,7 @@ describe('TodoList', () => {
     renderList(todos, onToggle)
     const activeNew = screen.getByRole('listitem', { name: 'active new' })
     const checkbox = within(activeNew).getByRole('checkbox')
-    const edit = within(activeNew).getByRole('button', { name: 'Edit todo' })
+    const edit = within(activeNew).getByRole('button', { name: 'Edit todo: active new' })
 
     await user.click(checkbox)
 
@@ -164,7 +188,7 @@ describe('TodoList', () => {
     const user = userEvent.setup()
     renderList()
     const activeNew = screen.getByRole('listitem', { name: 'active new' })
-    const edit = within(activeNew).getByRole('button', { name: 'Edit todo' })
+    const edit = within(activeNew).getByRole('button', { name: 'Edit todo: active new' })
     await user.click(edit)
 
     await user.click(screen.getByRole('button', { name: 'Save' }))
@@ -237,7 +261,7 @@ describe('TodoList', () => {
     renderList()
     const activeNew = screen.getByRole('listitem', { name: 'active new' })
 
-    await user.click(within(activeNew).getByRole('button', { name: 'Delete todo' }))
+    await user.click(within(activeNew).getByRole('button', { name: 'Delete todo: active new' }))
 
     expect(screen.getAllByRole('dialog')).toHaveLength(1)
     expect(screen.getByRole('dialog', { name: 'Delete this todo?' })).toHaveTextContent(
@@ -252,7 +276,7 @@ describe('TodoList', () => {
       const user = userEvent.setup()
       const { onDelete } = renderList()
       const activeNew = screen.getByRole('listitem', { name: 'active new' })
-      const trigger = within(activeNew).getByRole('button', { name: 'Delete todo' })
+      const trigger = within(activeNew).getByRole('button', { name: 'Delete todo: active new' })
       await user.click(trigger)
 
       if (action === 'Cancel') {
@@ -297,7 +321,7 @@ describe('TodoList', () => {
 
     render(<StatefulList />)
     const activeNew = screen.getByRole('listitem', { name: 'active new' })
-    await user.click(within(activeNew).getByRole('button', { name: 'Delete todo' }))
+    await user.click(within(activeNew).getByRole('button', { name: 'Delete todo: active new' }))
     const confirm = screen.getByRole('button', { name: 'Delete' })
 
     await user.click(confirm)
@@ -315,7 +339,7 @@ describe('TodoList', () => {
     expect(screen.getAllByRole('listitem')).toHaveLength(3)
     const neighboringDelete = within(
       screen.getByRole('listitem', { name: 'active old' }),
-    ).getByRole('button', { name: 'Delete todo' })
+    ).getByRole('button', { name: 'Delete todo: active old' })
     await waitFor(() => expect(neighboringDelete).toHaveFocus())
   })
 
@@ -338,7 +362,7 @@ describe('TodoList', () => {
     }
 
     render(<StatefulList />)
-    await user.click(screen.getByRole('button', { name: 'Delete todo' }))
+    await user.click(screen.getByRole('button', { name: `Delete todo: ${only.description}` }))
     await user.click(screen.getByRole('button', { name: 'Delete' }))
 
     await waitFor(() => expect(screen.queryByRole('listitem')).not.toBeInTheDocument())
@@ -366,13 +390,13 @@ describe('TodoList', () => {
 
     render(<StatefulList />)
     const finalTodo = screen.getByRole('listitem', { name: 'Completed: completed old' })
-    await user.click(within(finalTodo).getByRole('button', { name: 'Delete todo' }))
+    await user.click(within(finalTodo).getByRole('button', { name: 'Delete todo: completed old' }))
     await user.click(screen.getByRole('button', { name: 'Delete' }))
 
     await waitFor(() => expect(finalTodo).not.toBeInTheDocument())
     const precedingDelete = within(
       screen.getByRole('listitem', { name: 'Completed: completed new' }),
-    ).getByRole('button', { name: 'Delete todo' })
+    ).getByRole('button', { name: 'Delete todo: completed new' })
     await waitFor(() => expect(precedingDelete).toHaveFocus())
   })
 
@@ -410,13 +434,15 @@ describe('TodoList', () => {
     }
 
     render(<StatefulList />)
-    await user.click(screen.getByRole('button', { name: 'Delete todo' }))
+    await user.click(screen.getByRole('button', { name: `Delete todo: ${target.description}` }))
     await user.click(screen.getByRole('button', { name: 'Delete' }))
     act(() => addTodo())
     resolveDelete()
 
     const createdRow = await screen.findByRole('listitem', { name: created.description })
-    const createdDelete = within(createdRow).getByRole('button', { name: 'Delete todo' })
+    const createdDelete = within(createdRow).getByRole('button', {
+      name: `Delete todo: ${created.description}`,
+    })
     await waitFor(() => expect(createdDelete).toHaveFocus())
     expect(onFocusAdd).not.toHaveBeenCalled()
   })
@@ -451,14 +477,20 @@ describe('TodoList', () => {
     render(<StatefulList />)
     const siblingRow = screen.getByRole('listitem', { name: sibling.description })
     await user.click(within(siblingRow).getByRole('checkbox'))
-    expect(within(siblingRow).getByRole('button', { name: 'Delete todo' })).toBeDisabled()
+    expect(
+      within(siblingRow).getByRole('button', { name: `Delete todo: ${sibling.description}` }),
+    ).toBeDisabled()
 
     const targetRow = screen.getByRole('listitem', { name: target.description })
-    await user.click(within(targetRow).getByRole('button', { name: 'Delete todo' }))
+    await user.click(
+      within(targetRow).getByRole('button', { name: `Delete todo: ${target.description}` }),
+    )
     await user.click(screen.getByRole('button', { name: 'Delete' }))
 
     expect(onFocusAdd).not.toHaveBeenCalled()
-    const siblingDelete = within(siblingRow).getByRole('button', { name: 'Delete todo' })
+    const siblingDelete = within(siblingRow).getByRole('button', {
+      name: `Delete todo: ${sibling.description}`,
+    })
     expect(siblingDelete).toBeDisabled()
 
     resolveToggle({ ...sibling, completed: true })
@@ -466,7 +498,7 @@ describe('TodoList', () => {
       expect(
         within(
           screen.getByRole('listitem', { name: `Completed: ${sibling.description}` }),
-        ).getByRole('button', { name: 'Delete todo' }),
+        ).getByRole('button', { name: `Delete todo: ${sibling.description}` }),
       ).toHaveFocus(),
     )
   })
@@ -476,7 +508,7 @@ describe('TodoList', () => {
     const onDelete = vi.fn().mockRejectedValue(new Error('failed'))
     renderList(todos, undefined, undefined, onDelete)
     const activeNew = screen.getByRole('listitem', { name: 'active new' })
-    await user.click(within(activeNew).getByRole('button', { name: 'Delete todo' }))
+    await user.click(within(activeNew).getByRole('button', { name: 'Delete todo: active new' }))
 
     await user.click(screen.getByRole('button', { name: 'Delete' }))
 
