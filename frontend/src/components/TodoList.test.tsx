@@ -319,6 +319,32 @@ describe('TodoList', () => {
     await waitFor(() => expect(neighboringDelete).toHaveFocus())
   })
 
+  it('calls onFocusAdd after deleting the last remaining Todo', async () => {
+    const user = userEvent.setup()
+    const only = todos[2]
+    const onFocusAdd = vi.fn()
+
+    function StatefulList() {
+      const [list, setList] = useState([only])
+      return (
+        <TodoList
+          todos={list}
+          onToggle={async (todo) => todo}
+          onEdit={async (_id, description) => ({ ...only, description })}
+          onDelete={async (id) => setList((current) => current.filter((todo) => todo.id !== id))}
+          onFocusAdd={onFocusAdd}
+        />
+      )
+    }
+
+    render(<StatefulList />)
+    await user.click(screen.getByRole('button', { name: 'Delete todo' }))
+    await user.click(screen.getByRole('button', { name: 'Delete' }))
+
+    await waitFor(() => expect(screen.queryByRole('listitem')).not.toBeInTheDocument())
+    expect(onFocusAdd).toHaveBeenCalled()
+  })
+
   it("focuses the preceding Todo's Delete control after deleting the final displayed Todo", async () => {
     const user = userEvent.setup()
 

@@ -18,7 +18,7 @@ env:
 
 jobs:
   frontend:
-    name: Frontend (lint + typecheck + test)
+    name: Frontend (lint + typecheck + coverage)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -33,10 +33,21 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
-      - run: npm test
+      - run: npm run test:coverage
+      - name: Upload frontend coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: |
+            frontend/coverage/index.html
+            frontend/coverage/lcov.info
+            frontend/coverage/
+          retention-days: 7
+          if-no-files-found: warn
 
   backend:
-    name: Backend (lint + typecheck + test)
+    name: Backend (lint + typecheck + coverage)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -56,20 +67,31 @@ jobs:
         run: |
           docker compose -f docker-compose.test.yml up -d --wait
           docker compose -f docker-compose.test.yml ps
-      - name: Run tests (integration tests hit the ephemeral Postgres)
+      - name: Run tests with coverage (integration tests hit the ephemeral Postgres)
         env:
           NODE_ENV: test
           PORT: '8080'
           DATABASE_URL: postgres://todo:todo@localhost:5432/todo
           CORS_ORIGIN: http://localhost:5173
-        run: npm test
+        run: npm run test:coverage
+      - name: Upload backend coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: |
+            backend/coverage/index.html
+            backend/coverage/lcov.info
+            backend/coverage/
+          retention-days: 7
+          if-no-files-found: warn
       - name: Stop ephemeral test Postgres
         if: always()
         working-directory: .
         run: docker compose -f docker-compose.test.yml down -v
 
   e2e:
-    name: E2E (Playwright + ephemeral Postgres)
+    name: E2E (Playwright)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -81,21 +103,32 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: e2e/package-lock.json
-      - name: Start ephemeral test Postgres
-        working-directory: .
-        run: |
-          docker compose -f docker-compose.test.yml up -d --wait
-          docker compose -f docker-compose.test.yml ps
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
-      - run: npm test
-      - name: Stop ephemeral test Postgres
-        if: always()
+      - name: Build images and bring the stack up health-gated
         working-directory: .
-        run: docker compose -f docker-compose.test.yml down -v
+        run: docker compose up -d --build --wait --wait-timeout 180
+      - name: Poll /api/health until 200 (proxied through nginx)
+        working-directory: .
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8080/api/health > /dev/null; then
+              echo "backend healthy via proxy"
+              exit 0
+            fi
+            echo "waiting for /api/health ($i)..."
+            sleep 2
+          done
+          echo "timed out waiting for /api/health"
+          exit 1
+      - run: npm test
+      - name: Dump compose logs on failure
+        if: failure()
+        working-directory: .
+        run: docker compose logs
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v4
@@ -103,6 +136,10 @@ jobs:
           name: playwright-report
           path: e2e/playwright-report/
           retention-days: 7
+      - name: Tear down the stack
+        if: always()
+        working-directory: .
+        run: docker compose down -v
 
   compose-smoke:
     name: Compose smoke (one-command bring-up)

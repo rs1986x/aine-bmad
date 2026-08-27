@@ -46,6 +46,17 @@ describe('migration runner', () => {
   })
 })
 
+describe('unmatched routes', () => {
+  it('returns a NOT_FOUND envelope instead of Express HTML', async () => {
+    const res = await request(app).get('/api/does-not-exist')
+
+    expect(res.status).toBe(404)
+    expect(res.body).toEqual({
+      error: { code: 'NOT_FOUND', message: 'Route not found.' },
+    })
+  })
+})
+
 describe('GET /api/health', () => {
   it('returns 200 { status: "ok", db: "up" } when the DB is reachable', async () => {
     const res = await request(app).get('/api/health')
@@ -193,6 +204,20 @@ describe('POST /api/todos', () => {
 
     expect(res.status).toBe(400)
     expect(res.body.error.code).toBe('VALIDATION_ERROR')
+
+    const list = await request(app).get('/api/todos')
+    expect(list.body).toEqual([])
+  })
+
+  it('rejects a request body above 16kb with PAYLOAD_TOO_LARGE and persists nothing', async () => {
+    const res = await request(app)
+      .post('/api/todos')
+      .send({ description: 'x'.repeat(20_000) })
+
+    expect(res.status).toBe(413)
+    expect(res.body).toEqual({
+      error: { code: 'PAYLOAD_TOO_LARGE', message: 'Request payload too large.' },
+    })
 
     const list = await request(app).get('/api/todos')
     expect(list.body).toEqual([])

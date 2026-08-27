@@ -13,7 +13,10 @@ services:
       POSTGRES_PASSWORD: todo
       POSTGRES_DB: todo
     volumes:
-      - db-data:/var/lib/postgresql/data
+      # postgres:18+ stores data under /var/lib/postgresql/<major>/docker.
+      # Mount the parent so the named volume is not rejected as an unused
+      # /var/lib/postgresql/data path (same pattern as docker-compose.test.yml).
+      - db-data:/var/lib/postgresql
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U todo -d todo']
       interval: 5s
@@ -62,7 +65,7 @@ services:
     # busybox wget ships in nginx:stable-alpine, so `docker compose up --wait`
     # also gates on nginx serving the SPA.
     healthcheck:
-      test: ['CMD-SHELL', 'wget -qO- http://localhost/ >/dev/null 2>&1 || exit 1']
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1/ >/dev/null 2>&1 || exit 1']
       interval: 10s
       timeout: 3s
       retries: 5

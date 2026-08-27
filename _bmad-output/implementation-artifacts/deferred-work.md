@@ -48,3 +48,7 @@
 ## Deferred from: code review of spec-2-4-delete-a-todo-with-confirmation (2026-08-26)
 
 - Every row Delete control uses the same accessible name, `"Delete todo"`, so assistive-technology button lists cannot distinguish targets without surrounding row context. This predates Story 2.4's wiring; consider including the Todo description in each action label during a broader accessibility pass. [frontend/src/components/TodoItem.tsx:206]
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-1-e2e-suite-5-playwright-coverage-gate-70.md`
+  summary: Named-volume remount is not proven by the backend-restart E2E (db stays up).
+  evidence: Story 3.1 moved `db-data` to `/var/lib/postgresql` for postgres 18, but the restart test only `docker compose restart backend`. A mount that starts and then loses data on `down`/`up` without `-v` would still pass.

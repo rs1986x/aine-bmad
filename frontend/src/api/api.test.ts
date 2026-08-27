@@ -258,9 +258,9 @@ describe('updateTodo', () => {
       )
     vi.stubGlobal('fetch', fetchMock)
 
-    await expect(
-      updateTodo(updatedTodo.id.toUpperCase(), { completed: true }),
-    ).resolves.toEqual(updatedTodo)
+    await expect(updateTodo(updatedTodo.id.toUpperCase(), { completed: true })).resolves.toEqual(
+      updatedTodo,
+    )
     await expect(updateTodo(updatedTodo.id, { completed: true })).rejects.toEqual(
       new ApiError('malformed_response', 'Expected the applied Todo update', 200),
     )
@@ -365,6 +365,54 @@ describe('createTodo', () => {
 })
 
 describe('getTodos', () => {
+  it('classifies an already-aborted caller signal as a typed abort', async () => {
+    const caller = new AbortController()
+    caller.abort()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_url: string, init?: RequestInit) => {
+        return new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => {
+            reject(new DOMException('Aborted', 'AbortError'))
+          })
+          if (init?.signal?.aborted) {
+            reject(new DOMException('Aborted', 'AbortError'))
+          }
+        })
+      }),
+    )
+
+    await expect(getTodos(caller.signal)).rejects.toEqual(
+      new ApiError('aborted', 'Request aborted', 0),
+    )
+  })
+
+  it('falls through to a generic error when a failed response is not an error envelope', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response('<html>502 Bad Gateway</html>', { status: 502 })),
+    )
+
+    await expect(getTodos()).rejects.toEqual(
+      new ApiError('unknown', 'Request failed with status 502', 502),
+    )
+  })
+
+  it('falls through when an error envelope is missing code or message strings', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(JSON.stringify({ error: { message: 'no code' } }), { status: 500 }),
+        ),
+    )
+
+    await expect(getTodos()).rejects.toEqual(
+      new ApiError('unknown', 'Request failed with status 500', 500),
+    )
+  })
+
   it('validates every Todo in a successful list', async () => {
     vi.stubGlobal(
       'fetch',
