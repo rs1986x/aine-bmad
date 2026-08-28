@@ -32,9 +32,19 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
+      - name: Audit frontend dependencies
+        run: npm audit --audit-level=high --json > audit-results.json
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run test:coverage
+      - name: Upload frontend dependency audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dependency-audit
+          path: frontend/audit-results.json
+          retention-days: 7
+          if-no-files-found: error
       - name: Upload frontend coverage
         if: always()
         uses: actions/upload-artifact@v4
@@ -61,6 +71,8 @@ jobs:
           cache: npm
           cache-dependency-path: backend/package-lock.json
       - run: npm ci
+      - name: Audit backend dependencies
+        run: npm audit --audit-level=high --json > audit-results.json
       - run: npm run lint
       - run: npm run typecheck
       - name: Start ephemeral test Postgres
@@ -75,6 +87,14 @@ jobs:
           DATABASE_URL: postgres://todo:todo@localhost:5432/todo
           CORS_ORIGIN: http://localhost:5173
         run: npm run test:coverage
+      - name: Upload backend dependency audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-dependency-audit
+          path: backend/audit-results.json
+          retention-days: 7
+          if-no-files-found: error
       - name: Upload backend coverage
         if: always()
         uses: actions/upload-artifact@v4
@@ -105,6 +125,8 @@ jobs:
           cache: npm
           cache-dependency-path: e2e/package-lock.json
       - run: npm ci
+      - name: Audit E2E dependencies
+        run: npm audit --audit-level=high --json > audit-results.json
       - run: npm run lint
       - run: npm run typecheck
       - name: Install Playwright browsers
@@ -137,6 +159,14 @@ jobs:
           name: playwright-report
           path: e2e/playwright-report/
           retention-days: 7
+      - name: Upload E2E dependency audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-dependency-audit
+          path: e2e/audit-results.json
+          retention-days: 7
+          if-no-files-found: error
       - name: Upload axe accessibility results
         if: always()
         uses: actions/upload-artifact@v4
@@ -200,6 +230,54 @@ jobs:
           body=$(curl -fsS http://localhost:8080/api/todos)
           echo "Response: $body"
           echo "$body" | grep -qx '\[\]'
+      - name: Assert backend runtime image security posture
+        run: |
+          test "$(docker compose exec -T backend id -u)" -ne 0
+          docker compose exec -T backend node <<'NODE'
+          const { existsSync } = require('node:fs')
+          const { join } = require('node:path')
+          const { devDependencies = {} } = require('/app/package.json')
+          const present = Object.keys(devDependencies).filter((name) =>
+            existsSync(join('/app/node_modules', name)),
+          )
+          if (present.length > 0) {
+            console.error(`Direct devDependencies present in runtime image: ${present.join(', ')}`)
+            process.exit(1)
+          }
+          NODE
+          docker compose exec -T backend node <<'NODE'
+          const { readdirSync } = require('node:fs')
+          const { join } = require('node:path')
+          const environmentFiles = []
+          const scan = (directory) => {
+            for (const entry of readdirSync(directory, { withFileTypes: true })) {
+              const path = join(directory, entry.name)
+              if (entry.isDirectory() && entry.name !== 'node_modules') scan(path)
+              if (!entry.isDirectory() && entry.name.startsWith('.env')) environmentFiles.push(path)
+            }
+          }
+          scan('/app')
+          if (environmentFiles.length > 0) {
+            console.error(`Environment files present in runtime image: ${environmentFiles.join(', ')}`)
+            process.exit(1)
+          }
+          NODE
+      - name: Assert no real environment file is tracked
+        run: |
+          tracked_environment_files="$(
+            git ls-files '.env*' '**/.env*' |
+              while IFS= read -r file; do
+                case "$file" in
+                  .env.example) ;;
+                  *) printf '%s\n' "$file" ;;
+                esac
+              done
+          )"
+          if [ -n "$tracked_environment_files" ]; then
+            echo "Tracked environment files are not allowed:"
+            echo "$tracked_environment_files"
+            exit 1
+          fi
       - name: Dump compose logs on failure
         if: failure()
         run: docker compose logs

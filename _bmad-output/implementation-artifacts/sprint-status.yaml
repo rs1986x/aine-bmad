@@ -1,5 +1,5 @@
 # generated: 2026-06-16
-# last_updated: 2026-08-28 (story 3-2 → done; automated accessibility review passed)
+# last_updated: 2026-08-28 (story 3-3 → review)
 # project: aine-bmad
 # project_key: NOKEY
 # tracking_system: file-system
@@ -71,7 +71,7 @@ development_status:
   epic-3: in-progress
   3-1-e2e-suite-5-playwright-coverage-gate-70: done
   3-2-accessibility-audit-zero-critical-wcag-2-1-aa-violations: done
-  3-3-security-review-of-baseline-hardening: backlog
+  3-3-security-review-of-baseline-hardening: review
   epic-3-retrospective: optional
 
   # --- Epic 4: Deliverable Documentation & Reporting ---
