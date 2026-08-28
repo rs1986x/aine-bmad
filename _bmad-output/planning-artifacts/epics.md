@@ -382,19 +382,19 @@ As a stakeholder, I want end-to-end tests of the real stack and an enforced cove
 
 As any user, including those using assistive tech, I want the app to be accessible, so that I can use every feature.
 
-**Goal:** Automated `axe` scans + manual keyboard/screen-reader checks across all states; fix to zero critical violations.
+**Goal:** Automated `axe` scans plus browser-driven keyboard, focus, dialog, and reflow checks across all states; fix to zero critical violations.
 
 **Acceptance Criteria:**
 - **Given** each surface/state (list, empty, edit, error, delete dialog), **When** `axe` scans, **Then** zero critical/serious WCAG 2.1 AA violations.
 - **Given** keyboard only, **When** navigating, **Then** all actions are reachable, focus is visible (ring + offset), the dialog is focus-trapped, and `Esc` works.
-- **Given** a screen reader, **When** list changes/errors occur, **Then** `aria-live`/`role="alert"` announce them, and completion is conveyed by state + text (not color alone).
+- **Given** list changes or errors, **When** the accessibility API is inspected, **Then** `aria-live`/`role="alert"` expose them, and completion is conveyed by state + text (not color alone).
 - **Given** 200% text zoom, **When** applied, **Then** no loss of function (single-column reflow).
 
 **Implementation tasks:**
-- Integrate `@axe-core/playwright` scans per state; manual keyboard + SR checklist; fix violations; document residual non-critical items.
+- Integrate `@axe-core/playwright` scans per state; automate keyboard, focus, dialog, and reflow checks; fix violations; document residual non-critical items.
 
 **Test expectations:**
-- Automated `axe` assertions in E2E (zero critical); documented manual checklist results.
+- Automated `axe` assertions in E2E (zero critical) plus browser-driven interaction checks and committed evidence.
 
 **QA evidence expected:**
 - `axe` output per state + manual checklist (feeds the accessibility report 4.3).

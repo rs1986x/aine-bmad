@@ -89,6 +89,39 @@ describe('TodoList', () => {
     }
   })
 
+  it('disambiguates controls when multiple todos have the same description', () => {
+    const duplicates: Todo[] = [
+      {
+        id: 'duplicate-old',
+        description: 'Buy milk',
+        completed: false,
+        createdAt: '2026-01-01T00:00:00.000Z',
+      },
+      {
+        id: 'duplicate-new',
+        description: 'Buy milk',
+        completed: false,
+        createdAt: '2026-01-02T00:00:00.000Z',
+      },
+    ]
+    renderList(duplicates)
+
+    expect(screen.getByRole('checkbox', { name: 'Buy milk, item 1 of 2' })).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'Buy milk, item 2 of 2' })).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Edit todo: Buy milk, item 1 of 2' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Edit todo: Buy milk, item 2 of 2' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Delete todo: Buy milk, item 1 of 2' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Delete todo: Buy milk, item 2 of 2' }),
+    ).toBeInTheDocument()
+  })
+
   it('forwards toggle actions without changing the prop-backed checkbox early', async () => {
     const user = userEvent.setup()
     const onToggle = vi.fn<(todo: Todo) => Promise<Todo>>()

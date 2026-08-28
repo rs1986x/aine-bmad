@@ -51,11 +51,47 @@ async function expectVisibleFocusRing(name: string, control: Locator): Promise<v
   await expect(control, `${name} is not focused`).toBeFocused()
 
   const ring = await control.evaluate((element) => {
+    type Color = [number, number, number, number]
+    const parse = (value: string): Color => {
+      const channels = (value.match(/[\d.]+/g) ?? []).map(Number)
+      return [channels[0] ?? 0, channels[1] ?? 0, channels[2] ?? 0, channels[3] ?? 1]
+    }
+    const composite = (foreground: Color, background: Color): Color => {
+      const alpha = foreground[3] + background[3] * (1 - foreground[3])
+      return [
+        (foreground[0] * foreground[3] + background[0] * background[3] * (1 - foreground[3])) /
+          alpha,
+        (foreground[1] * foreground[3] + background[1] * background[3] * (1 - foreground[3])) /
+          alpha,
+        (foreground[2] * foreground[3] + background[2] * background[3] * (1 - foreground[3])) /
+          alpha,
+        alpha,
+      ]
+    }
+    const luminance = ([red, green, blue]: Color) => {
+      const channel = (value: number) => {
+        const ratio = value / 255
+        return ratio <= 0.03928 ? ratio / 12.92 : ((ratio + 0.055) / 1.055) ** 2.4
+      }
+      return 0.2126 * channel(red) + 0.7152 * channel(green) + 0.0722 * channel(blue)
+    }
+
     const style = getComputedStyle(element)
+    const ancestors: Element[] = []
+    for (let node = element.parentElement; node; node = node.parentElement) ancestors.unshift(node)
+    let background: Color = [255, 255, 255, 1]
+    for (const ancestor of ancestors) {
+      background = composite(parse(getComputedStyle(ancestor).backgroundColor), background)
+    }
+    const outline = composite(parse(style.outlineColor), background)
+    const lighter = Math.max(luminance(outline), luminance(background))
+    const darker = Math.min(luminance(outline), luminance(background))
+
     return {
       width: parseFloat(style.outlineWidth),
       style: style.outlineStyle,
       color: style.outlineColor,
+      contrast: (lighter + 0.05) / (darker + 0.05),
     }
   })
 
@@ -65,6 +101,7 @@ async function expectVisibleFocusRing(name: string, control: Locator): Promise<v
     alphaOf(ring.color),
     `${name} focus ring color ${ring.color} is transparent`,
   ).toBeGreaterThan(0)
+  expect(ring.contrast, `${name} focus ring contrast`).toBeGreaterThanOrEqual(3)
 }
 
 // jsdom performs no layout, so the CSS unit test can only read the stylesheet
@@ -75,6 +112,32 @@ async function expectHitArea(name: string, control: Locator): Promise<void> {
   if (!box) throw new Error(`${name} has no bounding box`)
   expect(box.width, `${name} width`).toBeGreaterThanOrEqual(MIN_HIT_AREA)
   expect(box.height, `${name} height`).toBeGreaterThanOrEqual(MIN_HIT_AREA)
+}
+
+async function expectNoHorizontalOverflow(page: Page, state: string): Promise<void> {
+  const overflow = await page.evaluate(() => {
+    const root = document.documentElement
+    const label = (element: Element) => {
+      const tag = element.tagName.toLowerCase()
+      const classes = typeof element.className === 'string' ? element.className.trim() : ''
+      return classes ? `${tag}.${classes.split(/\s+/).join('.')}` : tag
+    }
+
+    const offenders = Array.from(document.body.querySelectorAll('*'))
+      .map((element) => ({ element, rect: element.getBoundingClientRect() }))
+      .filter(({ rect }) => Math.round(rect.right) > root.clientWidth || Math.round(rect.left) < 0)
+      .map(
+        ({ element, rect }) =>
+          `${label(element)} [left=${Math.round(rect.left)}, right=${Math.round(rect.right)}]`,
+      )
+
+    return { scrollWidth: root.scrollWidth, clientWidth: root.clientWidth, offenders }
+  })
+
+  expect(overflow.offenders, `${state}: elements extending past either viewport edge`).toEqual([])
+  expect(overflow.scrollWidth, `${state}: document scroll width`).toBeLessThanOrEqual(
+    overflow.clientWidth,
+  )
 }
 
 test('Tab reaches the add input, then each row control in row order', async ({ page }) => {
@@ -270,31 +333,21 @@ test('reflows at 200% zoom with add, edit, and delete still operable', async ({ 
   await page.addStyleTag({ content: ':root { font-size: 200%; }' })
 
   await addTodo(page, description)
+  await expectNoHorizontalOverflow(page, 'populated list')
 
-  const overflow = await page.evaluate(() => {
-    const root = document.documentElement
-    const label = (element: Element) => {
-      const tag = element.tagName.toLowerCase()
-      const classes = typeof element.className === 'string' ? element.className.trim() : ''
-      return classes ? `${tag}.${classes.split(/\s+/).join('.')}` : tag
-    }
+  await editButton(page, description).click()
+  await expect(
+    page.getByRole('textbox', { name: `Edit description for ${description}` }),
+  ).toBeVisible()
+  await expectNoHorizontalOverflow(page, 'inline editor')
+  await cancelButton(page).click()
 
-    const offenders = Array.from(document.body.querySelectorAll('*'))
-      .map((element) => ({ element, rect: element.getBoundingClientRect() }))
-      // Both edges. Content pushed past the left edge is just as much a reflow
-      // failure as content past the right, and it produces no scrollbar to give
-      // itself away, so `scrollWidth` alone would never notice it.
-      .filter(({ rect }) => Math.round(rect.right) > root.clientWidth || Math.round(rect.left) < 0)
-      .map(
-        ({ element, rect }) =>
-          `${label(element)} [left=${Math.round(rect.left)}, right=${Math.round(rect.right)}]`,
-      )
-
-    return { scrollWidth: root.scrollWidth, clientWidth: root.clientWidth, offenders }
-  })
-
-  expect(overflow.offenders, 'elements extending past either viewport edge').toEqual([])
-  expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth)
+  await deleteButton(page, description).click()
+  const dialog = page.getByRole('dialog', { name: 'Delete this todo?' })
+  await expect(dialog).toBeVisible()
+  await expectNoHorizontalOverflow(page, 'delete dialog')
+  await page.keyboard.press('Escape')
+  await expect(dialog).toHaveCount(0)
 
   await editTodo(page, description, edited)
   await deleteTodo(page, edited)

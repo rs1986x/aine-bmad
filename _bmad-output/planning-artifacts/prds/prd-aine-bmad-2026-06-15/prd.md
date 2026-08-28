@@ -239,7 +239,7 @@ The MVP is complete when all of the following hold (these aggregate the per-FR t
 - **D-5 Docker Compose** — one-command bring-up of the full stack (NFR-6).
 - **D-6 Documentation** — README covering run, test, architecture overview, and API summary.
 - **D-7 QA report + coverage evidence** — consolidated QA report (strategy, levels, FR/NFR traceability, results, defects) plus coverage evidence demonstrating the ≥70% target (NFR-7). *(Realized by Epic 4.)*
-- **D-8 Accessibility report** — `axe`-per-state results + manual keyboard/screen-reader checklist attesting zero critical WCAG 2.1 AA violations (NFR-3). *(Realized by Epic 4.)*
+- **D-8 Accessibility report** — `axe`-per-state results plus browser-driven keyboard, focus, dialog, and reflow evidence attesting zero critical WCAG 2.1 AA violations (NFR-3). *(Realized by Epic 4.)*
 - **D-9 Security review** — write-up of the baseline controls (helmet, scoped CORS, body-size limit, parameterized SQL, error hygiene, non-root container, secrets handling), method, results, and residual risks (§11). *(Realized by Epic 4.)*
 - **D-10 AI integration log** — record of AI usage across the BMAD lifecycle (planning + implementation), notable prompts/decisions, value, and human corrections. *(Realized by Epic 4.)*
 

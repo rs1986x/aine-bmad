@@ -1,5 +1,5 @@
 # generated: 2026-06-16
-# last_updated: 2026-08-27 (story 3-2 → review, code review passed)
+# last_updated: 2026-08-28 (story 3-2 → done; automated accessibility review passed)
 # project: aine-bmad
 # project_key: NOKEY
 # tracking_system: file-system
@@ -37,7 +37,7 @@
 #   green; tests and code land in the SAME change. No story is 'done' with code ahead of its tests.
 
 generated: 2026-06-16
-last_updated: 2026-08-27
+last_updated: 2026-08-28
 project: aine-bmad
 project_key: NOKEY
 tracking_system: file-system
@@ -70,7 +70,7 @@ development_status:
   # security review of baseline hardening.
   epic-3: in-progress
   3-1-e2e-suite-5-playwright-coverage-gate-70: done
-  3-2-accessibility-audit-zero-critical-wcag-2-1-aa-violations: review
+  3-2-accessibility-audit-zero-critical-wcag-2-1-aa-violations: done
   3-3-security-review-of-baseline-hardening: backlog
   epic-3-retrospective: optional
 

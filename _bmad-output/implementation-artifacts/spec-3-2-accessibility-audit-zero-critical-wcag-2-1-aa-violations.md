@@ -15,7 +15,7 @@ context:
 
 **Problem:** The app has never been scanned for accessibility — there is zero `axe` integration anywhere, and the only evidence today is hand-written RTL role queries. Two a11y defects sit unresolved in the deferred ledger: no stable page heading across loading/error/empty/populated, and every row's checkbox, Edit, and Delete share an identical accessible name, so assistive-tech control lists cannot tell rows apart.
 
-**Approach:** Scan the five UI states with `@axe-core/playwright` inside the existing real-stack suite, gate CI on zero critical or serious WCAG 2.1 AA violations, automate the keyboard, focus, dialog, and reflow checks a browser can prove, fix what the audit surfaces, and record screen-reader results and residual items in a committed checklist that Story 4.3 turns into the formal report.
+**Approach:** Scan the five UI states with `@axe-core/playwright` inside the existing real-stack suite, gate CI on zero critical or serious WCAG 2.1 AA violations, automate the keyboard, focus, dialog, and reflow checks a browser can prove, fix what the audit surfaces, and record the results and residual items in a committed checklist that Story 4.3 turns into the formal report.
 
 ## Boundaries & Constraints
 
@@ -23,7 +23,7 @@ context:
 
 **Ask First:** Disabling, excluding, or narrowing any `axe` rule or selector; changing a *visible* label, layout, or interaction purely to satisfy a rule; any dependency beyond `@axe-core/playwright`; widening scope to WCAG 2.2 or AAA.
 
-**Never:** Drive the Docker Compose lifecycle from the a11y specs (`stack.spec.ts` owns that and runs serially); manufacture violations if a scan is clean; silence a finding by hiding content from assistive tech; alter server behavior; take on Story 3.3 security scope; drive a real screen reader in CI.
+**Never:** Drive the Docker Compose lifecycle from the a11y specs (`stack.spec.ts` owns that and runs serially); manufacture violations if a scan is clean; silence a finding by hiding content from assistive tech; alter server behavior; take on Story 3.3 security scope.
 
 ## I/O & Edge-Case Matrix
 
@@ -45,7 +45,7 @@ context:
 - `e2e/support/app.ts:7-55` -- reuse `openApp`/`addTodo`/`toggleTodo`. **Ripples:** `toggleTodo:37` pins checkbox name `Completed`/`Not completed`; `editTodo:43` pins `Edit todo`; `deleteTodo:50` pins `Delete todo`. All three must move to the new per-row names.
 - `e2e/tests/a11y.spec.ts` -- **new**. The five DOM states from the matrix; the zoom/reflow row belongs to `keyboard.spec.ts`. Use `page.route('**/api/todos', ...)` for empty and load-failure — the local DB is shared and `cleanupE2eTodos` only removes `e2e `-prefixed rows, so a real empty list is not reachable. Do **not** add `mode: 'serial'`.
 - `e2e/tests/keyboard.spec.ts` -- **new**. Tab order reaches add input → checkbox → Edit → Delete; focused controls report a non-zero computed `outlineWidth`; dialog traps Tab between Cancel and Delete, `Esc` closes, focus returns to the triggering Delete button; reflow test halves the viewport and sets root `font-size: 200%`.
-- `frontend/src/components/TodoItem.tsx:143` -- checkbox `aria-label` is `'Completed'`/`'Not completed'`, identical on every row. Make the name the description and let `checked` carry state. `:201` / `:229` -- `Edit todo` / `Delete todo` become `Edit todo: {description}` / `Delete todo: {description}`. Leave `<li> aria-label` (`:125`, built at `:44-45`) alone — `expectListOrder` and `todoItem()` depend on it.
+- `frontend/src/components/TodoItem.tsx:143` -- checkbox `aria-label` is `'Completed'`/`'Not completed'`, identical on every row. Make the name the description and let `checked` carry state. `:201` / `:229` -- `Edit todo` / `Delete todo` become `Edit todo: {description}` / `Delete todo: {description}`. When descriptions repeat, `TodoList` appends duplicate-only position text (`item 1 of 2`) to the row and control names so valid duplicate todos remain distinguishable.
 - `frontend/src/App.tsx:46-98` -- `<main>` wraps three mutually exclusive branches (load-failure `:48`, loading `:59`, content `:61`), so no heading survives across states. Add a persistent `<h1>` inside `<main>` **above** the branch. Live region `:95-97` and `aria-busy` `:47` are correct — do not touch.
 - `frontend/src/components/EmptyState.tsx:6` -- demote its `<h1>` to `<h2>` once the shell owns `<h1>`. `crud.spec.ts:25` queries this heading without a level, so it keeps working.
 - `frontend/src/styles/app.css:119-126` (`.error-banner__retry`) and `:196-202` (`.add-todo-form__submit`) -- padding only, no `min-height`; every other control already sets 44px. Add `min-height: 44px`. No `outline: none` exists anywhere; focus rings are `2px solid var(--color-focus-ring)` with `offset: 2px`.
@@ -67,14 +67,28 @@ context:
 - [x] `frontend/src/styles/app.css` -- bring the add-submit and retry buttons up to the 44px minimum height the rest of the UI already meets.
 - [x] `e2e/support/app.ts`, `e2e/tests/crud.spec.ts`, `frontend/src/**/*.test.{ts,tsx}` -- update every selector and assertion pinned to a renamed accessible name; do not weaken an assertion to make it pass.
 - [x] `.github/workflows/ci.yml` -- upload the `axe` evidence whether the E2E job passes or fails, before teardown.
-- [x] `docs/accessibility-audit.md` -- record the per-state automated results, the manual keyboard and screen-reader checklist with actual outcomes, every `incomplete` axe result with its resolution, and residual non-critical items.
+- [x] `docs/accessibility-audit.md` -- record the per-state automated results, browser-driven keyboard checks, every `incomplete` axe result with its resolution, and residual non-critical items.
 
 **Acceptance Criteria:**
 - Given the health-gated Compose stack, when the E2E suite runs in CI, then every matrix state is scanned against WCAG 2.1 A/AA tags and any critical or serious violation fails the job.
 - Given a CI run that passes or fails, when evidence is collected, then per-state `axe` JSON is uploaded alongside the Playwright report and survives teardown.
 - Given assistive technology enumerating controls, when a list holds more than one todo, then each row's checkbox, Edit, and Delete control is distinguishable by accessible name alone.
 - Given any application state — loading, load failure, empty, or populated — when the heading outline is inspected, then exactly one stable top-level heading is present and no heading level is skipped.
-- Given the audit is complete, when `docs/accessibility-audit.md` is read, then it states real observed outcomes for each manual check and each residual item, with no placeholder or aspirational text.
+- Given the audit is complete, when `docs/accessibility-audit.md` is read, then it states real observed outcomes for each recorded check and each residual item, with no placeholder or aspirational text.
+
+### Review Findings
+
+- [x] [Review][Patch] Disambiguate duplicate descriptions with duplicate-only position labels [frontend/src/components/TodoList.tsx]
+- [x] [Review][Patch] Make the populated-list scan deterministic [e2e/tests/a11y.spec.ts:39]
+- [x] [Review][Patch] Pin stable target identity for incomplete axe results [e2e/support/a11y.ts:72]
+- [x] [Review][Patch] Correct direct contrast measurement for translucent or painted backgrounds [e2e/support/a11y.ts:104]
+- [x] [Review][Patch] Pin the exact required WCAG tag scope in gate tests [e2e/tests/a11y-gate.spec.ts:10]
+- [x] [Review][Patch] Verify the complete five-state axe evidence manifest [e2e/support/global-teardown.ts]
+- [x] [Review][Patch] Verify focus-ring contrast rather than only width and opacity [e2e/tests/keyboard.spec.ts:50]
+- [x] [Review][Patch] Check horizontal overflow while the editor and delete dialog are open [e2e/tests/keyboard.spec.ts:263]
+- [x] [Review][Patch] Dismiss the delete dialog with Escape in its scan cleanup [e2e/tests/a11y.spec.ts:106]
+- [x] [Review][Patch] Prevent Playwright retries from turning a blocking accessibility result into a passing gate [e2e/tests/a11y.spec.ts]
+- [x] [Review][Patch] Add a negative self-test for undecided-contrast enforcement [e2e/tests/a11y-gate.spec.ts:35]
 
 ## Design Notes
 
@@ -82,12 +96,12 @@ Request interception, not container control, is what makes the empty and load-fa
 
 `axe` returns `incomplete` for checks it cannot decide alone — the row action buttons sit at `opacity: 0` until `:hover`/`:focus-within`, which commonly lands there. Persist them and resolve each in the checklist; never let an `incomplete` count as a pass.
 
-The expected accessible-name shape, with state carried by `checked` rather than by the name:
+The expected accessible-name shape, with state carried by `checked` rather than by the name. `accessibleName` equals `description` for ordinary rows and adds duplicate-only position text when needed:
 
 ```tsx
-<input type="checkbox" checked={completed} aria-label={description} />
-<button aria-label={`Edit todo: ${description}`}>…</button>
-<button aria-label={`Delete todo: ${description}`}>…</button>
+<input type="checkbox" checked={completed} aria-label={accessibleName} />
+<button aria-label={`Edit todo: ${accessibleName}`}>…</button>
+<button aria-label={`Delete todo: ${accessibleName}`}>…</button>
 ```
 
 If the scans come back clean at critical/serious, that is the honest result — the deliverable is the enforced gate plus the evidence, not a violation count.
@@ -100,8 +114,7 @@ If the scans come back clean at critical/serious, that is the honest result — 
 - `cd e2e && npm run lint && npm run typecheck && npm test` -- expected: the full suite passes, including the new a11y and keyboard specs, with `e2e/axe-results/*.json` written for every state.
 - `docker compose down -v` -- expected: the local verification stack is removed after all assertions complete.
 
-**Manual checks (if no CLI):**
-- Drive the full add → complete → edit → delete path with VoiceOver (or NVDA) and record verbatim announcements for list changes, errors, and the delete dialog in `docs/accessibility-audit.md`.
+**Manual check (if no CLI):**
 - Confirm at 200% browser text zoom that the single-column layout reflows without horizontal scrolling and no control becomes unreachable.
 
 ## Suggested Review Order

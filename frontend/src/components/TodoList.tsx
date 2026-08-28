@@ -21,6 +21,31 @@ interface DeleteTarget {
   trigger: HTMLButtonElement
 }
 
+function controlNamesByTodo(todos: Todo[]): Map<string, string> {
+  const keyOf = (description: string) => description.trim().replace(/\s+/g, ' ')
+  const totals = new Map<string, number>()
+  const positions = new Map<string, number>()
+  const names = new Map<string, string>()
+
+  for (const todo of todos) {
+    const key = keyOf(todo.description)
+    totals.set(key, (totals.get(key) ?? 0) + 1)
+  }
+
+  for (const todo of todos) {
+    const key = keyOf(todo.description)
+    const total = totals.get(key) ?? 1
+    const position = (positions.get(key) ?? 0) + 1
+    positions.set(key, position)
+    names.set(
+      todo.id,
+      total > 1 ? `${todo.description}, item ${position} of ${total}` : todo.description,
+    )
+  }
+
+  return names
+}
+
 export function TodoList({
   todos,
   onToggle,
@@ -38,6 +63,7 @@ export function TodoList({
   const focusObserverRef = useRef<MutationObserver | null>(null)
   const { active, completed } = groupTodos(todos)
   const orderedTodos = [...active, ...completed]
+  const controlNames = controlNamesByTodo(orderedTodos)
 
   useEffect(
     () => () => {
@@ -161,6 +187,7 @@ export function TodoList({
     <TodoItem
       key={todo.id}
       todo={todo}
+      accessibleName={controlNames.get(todo.id)}
       isEditing={editingTodoId === todo.id}
       editDisabled={editingTodoId !== null && editingTodoId !== todo.id}
       onToggle={onToggle}

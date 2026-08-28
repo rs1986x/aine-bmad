@@ -12,7 +12,7 @@ report; nothing here is a projection — every line is an outcome that was obser
 | axe tags   | `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`                                                                                                                                                                                                       |
 | Tooling    | `@axe-core/playwright` 4.13.0 (axe-core 4.13.0), Playwright 1.61.0, Chromium                                                                                                                                                                     |
 | Under test | `http://localhost:8080` — the Compose stack (nginx → Express → PostgreSQL), not a dev server                                                                                                                                                     |
-| Run date   | 2026-08-27                                                                                                                                                                                                                                       |
+| Run date   | 2026-08-28                                                                                                                                                                                                                                       |
 | Harness    | `e2e/tests/a11y.spec.ts` (scans), `e2e/tests/keyboard.spec.ts` (keyboard, focus, hit areas, reflow), `e2e/tests/a11y-gate.spec.ts` (gate self-test), helper in `e2e/support/a11y.ts`                                                             |
 | Gate       | Any `critical`, `serious`, or **unrated** violation fails the E2E job, as does any change to the pinned `incomplete` set or any undecided contrast check that measures below threshold. Per-state JSON is uploaded from CI on pass **and** fail. |
 | Evidence   | `e2e/axe-results/{state}.json`, each holding `violations` **and** `incomplete`                                                                                                                                                                   |
@@ -20,20 +20,23 @@ report; nothing here is a projection — every line is an outcome that was obser
 The gate fails closed. A violation axe leaves without an impact rating blocks
 exactly like a `critical` one, because "unrated" is the one case where treating
 absence as safety would let a rule pass in silence. The `incomplete` set is
-pinned per state on rule id, message keys, and node count — not on node targets,
-which are React `useId` values that move with tree shape — so a check drifting
-into or out of "undecidable" fails the run instead of quietly changing the
-artifact. Every `color-contrast` result axe leaves undecided is then measured
-directly and held to the WCAG threshold, because an undecided verdict carries no
-ratio and would otherwise pass on any colour at all. `e2e/tests/a11y-gate.spec.ts`
-exercises the pure gate functions against synthetic axe results so a mistyped tag
-list or impact filter cannot turn every future run into a permanent clean pass.
+pinned per state on rule id, message keys, node count, and normalized target
+identity. Generated React `useId` values are removed from that identity while the
+element tag and stable attributes remain, so moving the same undecided result to
+different content fails the run. Every `color-contrast` result axe leaves
+undecided is then measured directly and held to the WCAG threshold, because an
+undecided verdict carries no ratio and would otherwise pass on any colour at all.
+Solid translucent backgrounds are composited; unsupported image, blend, opacity,
+or shadow effects fail closed rather than yielding an invented ratio.
+`e2e/tests/a11y-gate.spec.ts` pins the exact tag set and exercises impact,
+incomplete-target, evidence-manifest, and unreadable-contrast failure paths.
 
-Evidence is written per attempt: `{state}.json` on the first try and
-`{state}.retry-N.json` after that, so a scan that fails and then passes under
-CI's two retries cannot overwrite its own failing artifact. Global setup clears
-`axe-results/` first, so a renamed or deleted state cannot leave a stale file
-behind that still satisfies CI's `if-no-files-found: error` check.
+Accessibility scan and gate files disable Playwright retries so a blocking result
+cannot become a passing CI gate on a later attempt. Evidence naming still
+preserves a retry suffix if retries are explicitly overridden. Global setup
+clears `axe-results/` first, and CI teardown verifies that all five required state
+files exist, so a renamed, removed, or skipped scan cannot masquerade as complete
+evidence.
 
 No axe rule, tag, or selector is disabled, excluded, or narrowed anywhere in the
 harness. `best-practice`, WCAG 2.2, and AAA rules are out of scope for this story
@@ -48,14 +51,15 @@ cd e2e && npm test
 
 ## Automated scan results
 
-Five DOM states, one scan each. Three of them — empty, load failure, and delete
-dialog — are reached by intercepting `GET /api/todos`, because the local database
-is shared and `cleanupE2eTodos` only removes `e2e `-prefixed rows, so a genuinely
-empty, failing, or fixed-length list is not otherwise reachable. Only the list
-data is stubbed; the app, the nginx container, and the rendered DOM are the real
-ones, and `stack.spec.ts` still proves the real backend-down path against the
-running containers. The populated-list scan runs against whatever the live
-database holds.
+Five DOM states, one scan each. Four of them — populated, empty, load failure,
+and delete dialog — intercept the initial `GET /api/todos`, because the local
+database is shared and `cleanupE2eTodos` only removes `e2e `-prefixed rows. The
+populated scan starts from a deterministic empty response and then creates one
+active and one completed todo through the real API; its mutation requests are
+not stubbed. Only list reads needed to establish a fixed DOM are intercepted;
+the app, nginx container, mutation API, and rendered DOM are real, while
+`stack.spec.ts` still proves the backend-down path against the running
+containers.
 
 | State                                       | Evidence file             | Critical/serious | Other violations | Incomplete |
 | ------------------------------------------- | ------------------------- | ---------------- | ---------------- | ---------- |
@@ -136,15 +140,15 @@ of a mystifying pin mismatch.
 These run as real browser assertions in `e2e/tests/keyboard.spec.ts`, so they are
 re-checked on every CI run rather than being a one-off manual note.
 
-| Check                | Observed outcome                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Tab order            | From the add input: **Add button → row checkbox → row Edit → row Delete**, in row order. Asserted with `toBeFocused` at each step.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| Visible focus        | Ten controls, each checked while keyboard-focused: add input, Add, row checkbox, row Edit, row Delete, editor Save, editor Cancel, dialog Cancel, dialog Delete, banner Retry. Each must report a computed `outlineWidth` above 0, an `outlineStyle` that is not `none`, **and** an `outlineColor` whose alpha is above 0 — width alone would pass for a ring that is switched off or fully transparent. Focus is driven with real `Tab` presses so `:focus-visible` actually applies; the editor and dialog are likewise opened by `Enter` so Chromium's keyboard modality holds for the controls they focus themselves. |
-| Dialog initial focus | Opening the delete dialog puts focus on **Cancel**.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| Dialog focus trap    | `Tab` from Cancel → Delete; `Tab` from Delete → back to Cancel; `Shift+Tab` from Cancel → Delete. Focus never escapes the dialog.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| `Esc` dismissal      | `Esc` closes the dialog without deleting; the todo is still present afterwards.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| Focus return         | After `Esc`, focus returns to the exact Delete button that opened the dialog.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| Reflow               | 1280×720 applied, then halved to 640×360 (what 200% browser page zoom does to a px-based layout) plus `:root { font-size: 200% }`. `documentElement.scrollWidth` 640 = `clientWidth` 640, no horizontal scrollbar, and no element crosses **either** edge — the left edge is checked too, because content pushed off to the left creates no scrollbar and `scrollWidth` alone would never reveal it. Add, edit, and delete were all driven to completion at that size.                                                                                                                                                    |
+| Check                | Observed outcome                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tab order            | From the add input: **Add button → row checkbox → row Edit → row Delete**, in row order. Asserted with `toBeFocused` at each step.                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Visible focus        | Ten controls, each checked while keyboard-focused: add input, Add, row checkbox, row Edit, row Delete, editor Save, editor Cancel, dialog Cancel, dialog Delete, banner Retry. Each must report a computed `outlineWidth` above 0, a style other than `none`, non-transparent colour, and at least **3:1 contrast** against its composited ancestor background. Focus is driven with real `Tab` presses so `:focus-visible` actually applies; the editor and dialog are likewise opened by `Enter` so Chromium's keyboard modality holds for the controls they focus themselves. |
+| Dialog initial focus | Opening the delete dialog puts focus on **Cancel**.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Dialog focus trap    | `Tab` from Cancel → Delete; `Tab` from Delete → back to Cancel; `Shift+Tab` from Cancel → Delete. Focus never escapes the dialog.                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `Esc` dismissal      | `Esc` closes the dialog without deleting; the todo is still present afterwards.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Focus return         | After `Esc`, focus returns to the exact Delete button that opened the dialog.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Reflow               | 1280×720 applied, then halved to 640×360 (what 200% browser page zoom does to a px-based layout) plus `:root { font-size: 200% }`. The populated list, open inline editor, and open delete dialog each have no horizontal scrollbar and no element crossing **either** edge. Add, edit, and delete are all driven to completion at that size.                                                                                                                                                                                                                                    |
 
 ### Note on `:root { font-size: 200% }`
 
@@ -192,11 +196,11 @@ above, which is the box a pointer actually has to hit. The checkbox is measured
 at its wrapping `<label>`: the 22px input is deliberately nested inside a 44px
 label, and the label is what takes the click.
 
-## Accessibility tree as exposed to assistive technology
+## Accessibility tree
 
-Captured from Chromium against the running stack. This is the computed tree a
-screen reader consumes — it is not a substitute for listening to one (see
-residual items).
+Captured from Chromium against the running stack. This records the roles, names,
+states, headings, live regions, and alerts exposed through the browser's
+accessibility API.
 
 Populated list:
 
@@ -255,8 +259,10 @@ Both were standing entries in the deferred ledger; both are now closed.
    shared one name (`Completed`/`Not completed`, `Edit todo`, `Delete todo`), so
    an assistive-technology control list could not tell rows apart. Each control
    is now named after its own todo — `{description}`, `Edit todo: {description}`,
-   `Delete todo: {description}` — with completion left to the checkbox's `checked`
-   state rather than folded into the name. Uniqueness is asserted in
+   `Delete todo: {description}` — with completion left to the checkbox's
+   `checked` state. If descriptions repeat, duplicate-only position text is
+   appended (`Buy milk, item 1 of 2`) so every name remains distinguishable
+   without adding noise to ordinary rows. Both paths are asserted in
    `frontend/src/components/TodoList.test.tsx`.
 2. **No stable heading across states.** The only `<h1>` lived in `EmptyState`, so
    it appeared and vanished with the data. A persistent `<h1>Todo</h1>` now sits
@@ -269,45 +275,37 @@ Both were standing entries in the deferred ledger; both are now closed.
 
 None are critical or serious. Each is a real, observed limitation.
 
-1. **No screen reader was actually driven.** The verbatim VoiceOver / NVDA
-   announcement pass described in the story's manual checks was **not performed** —
-   this audit was produced by automation, which cannot listen to a screen reader.
-   What exists instead is the computed accessibility tree above plus the live-region
-   and `role="alert"` text, which show what would be announced but not how a
-   specific screen reader renders it. A human pass through
-   add → complete → edit → delete with VoiceOver (macOS/Safari) and NVDA
-   (Windows/Firefox), recording verbatim announcements, is still outstanding.
-2. **Text-only resize is untested and probably unsupported.** All type tokens are
+1. **Text-only resize is untested and probably unsupported.** All type tokens are
    absolute `px`, so a browser text-only zoom (Firefox's "Zoom text only", or a
    user stylesheet raising the root font size) does not enlarge the UI — measured
    above. Full-page zoom, which is what Chrome offers and what WCAG 1.4.4 is
    normally satisfied against, works and is covered by the reflow test. Moving the
    type ramp to `rem` would close the gap; it is a design-token change beyond this
    story's scope.
-3. **One browser engine.** Every scan and keyboard assertion ran in Chromium
+2. **One browser engine.** Every scan and keyboard assertion ran in Chromium
    only — the Playwright project list has a single `chromium` entry. Firefox and
    WebKit differences (notably `:focus-visible` heuristics and checkbox rendering)
    are unverified.
-4. **Reflow is tested at one size.** The reflow test uses 640×360. The WCAG 1.4.10
+3. **Reflow is tested at one size.** The reflow test uses 640×360. The WCAG 1.4.10
    reference condition, 320 CSS px wide, is not exercised, nor is a real mobile
    device.
-5. **The pinned `incomplete` set is version- and layout-sensitive.** Drift now
-   fails the run, which is the point, but the pin is keyed on axe's own
-   `messageKey` values and, for the delete dialog, on a fixed eight-row fixture
-   whose height puts a row behind the dialog. An axe-core upgrade that renames a
-   message key, or a spacing change that alters where the dialog lands, will fail
-   these scans for a reason that is not an accessibility regression. That failure
-   is intentional — it forces the new set to be resolved here before the
-   expectation moves — but it is maintenance the next person will have to do.
-6. **Grouping has no structural semantics.** Active and completed todos render as
+4. **The pinned `incomplete` set is version- and layout-sensitive.** Drift now
+   fails the run, which is the point. The pin uses axe's `messageKey` values,
+   normalized target identity, and, for the delete dialog, a fixed eight-row
+   fixture whose height puts a row behind the dialog. An axe-core upgrade that
+   renames a message key, or a spacing change that alters where the dialog lands,
+   will fail these scans for a reason that is not an accessibility regression.
+   That failure is intentional — it forces the new set to be resolved here before
+   the expectation moves — but it is maintenance the next person will have to do.
+5. **Grouping has no structural semantics.** Active and completed todos render as
    two runs inside one `<ul>` with no group headings or labels — carried over from
    the UX accessibility review's low-severity L3 finding. The per-row
    `Completed: {description}` label is the current mitigation.
-7. **Row actions are `opacity: 0` until hover or focus-within** above the 640px
+6. **Row actions are `opacity: 0` until hover or focus-within** above the 640px
    breakpoint. They stay in the tab order and the accessibility tree (confirmed by
    the tab-order test and the trees above), and the seven rules that do evaluate
    them once revealed all pass, but sighted mouse users only see them on hover.
-8. **Icon-only control contrast is not covered by any requested axe rule.** The
+7. **Icon-only control contrast is not covered by any requested axe rule.** The
    Edit and Delete buttons hold an `aria-hidden` SVG and no text, so
    `color-contrast` — which measures text — never applies to them, revealed or
    not. Measured by hand instead: the icon stroke is `rgb(91, 100, 112)`

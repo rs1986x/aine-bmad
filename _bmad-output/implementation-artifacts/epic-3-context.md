@@ -4,7 +4,7 @@
 
 ## Goal
 
-Prove that the completed Todo product is reliable, accessible, meaningfully tested, and free of obvious baseline security weaknesses. This epic turns the functional work into repeatable CI evidence: the full user journey and restart durability must pass end to end, coverage cannot silently regress below 70%, WCAG 2.1 AA checks must find no critical or serious violations, and the architecture's security and future-extensibility claims must be verified.
+Prove that the completed Todo product meets its reliability, accessibility, test-quality, and baseline-security bar, and produce repeatable evidence for those claims. The full user journey and restart durability must pass end to end, coverage cannot silently regress below 70%, WCAG 2.1 AA checks must find no critical or serious violations, and the architecture's security and future-extensibility decisions must be verified.
 
 ## Stories
 
@@ -17,16 +17,16 @@ Prove that the completed Todo product is reliable, accessible, meaningfully test
 - Run at least five deterministic Playwright tests against the real Compose stack, covering create; complete and un-complete with re-sorting; inline edit; confirmed permanent delete; persistence after reload and backend restart; and the backend-unavailable failure path with an error banner and preserved input.
 - CI must wait for `/api/health` before E2E execution. The test suite must report zero data-loss occurrences across refresh, browser-session, and backend-restart checks.
 - Enforce at least 70% meaningful coverage in both frontend and backend Vitest configurations. CI must fail below the threshold, and coverage gaps must be filled with tests of real service, repository, hook, and component logic rather than padding. Archive Playwright and coverage reports as evidence.
-- Automated `axe` checks must cover the populated list, empty state, inline edit, error state, and delete dialog, with zero critical or serious WCAG 2.1 AA violations. Manual checks must verify keyboard-only use, visible focus, dialog trapping and `Esc`, screen-reader announcements, non-color completion cues, and full functionality at 200% text zoom.
+- Automated `axe` checks must cover the populated list, empty state, inline edit, error state, and delete dialog, with zero critical or serious WCAG 2.1 AA violations. Browser checks must verify keyboard-only use, visible focus, dialog trapping and `Esc`, non-color completion cues, and full functionality at 200% text zoom.
 - Verify security headers, disabled `X-Powered-By`, configured-origin CORS, rejection of request bodies above 16 KB, write validation, parameterized SQL, safe client errors without stack or internal detail leakage, non-root runtime containers, production-only runtime dependencies, and absence of committed secrets. Dependency audits must contain no high or critical findings.
-- Keep the v1 boundary: this is a local, single-user app with no authentication. The review must still verify that UUID identifiers, the Todo schema, and route-to-service-to-repository boundaries permit a later `user_id` and authentication middleware without rewriting existing Todo behavior.
+- Keep the v1 boundary: this is a local, single-user app with no authentication and is not intended for public exposure. The review must still verify that UUID identifiers, the Todo schema, and route-to-service-to-repository boundaries permit a later `user_id` and authentication middleware without rewriting existing Todo behavior.
 
 ## Technical Decisions
 
 - Playwright exercises the browser against the complete nginx → Express → PostgreSQL stack. Tests use stable selectors and health-based readiness, not timing assumptions or external network dependencies.
 - Integration tests use an ephemeral PostgreSQL service, apply migrations from a clean state, and truncate data between tests. Persistence verification must reconnect or restart the relevant service while retaining the named database volume.
 - Vitest supplies backend unit/integration coverage and frontend component coverage; Supertest verifies HTTP behavior. Coverage thresholds belong in both package configurations and run as a blocking CI stage.
-- Accessibility automation uses `@axe-core/playwright` in the E2E suite. Automated scans complement rather than replace the documented keyboard, screen-reader, focus, contrast, and zoom checks.
+- Accessibility automation uses `@axe-core/playwright` in the E2E suite. Automated scans complement the browser-driven keyboard, focus, contrast, and zoom checks.
 - The server remains authoritative: UI state changes only after confirmed API responses. Failure tests must assert non-destructive recovery and retained user intent.
 - Security verification must respect the architecture boundaries: routes perform HTTP handling and Zod parsing, services own logic and typed errors, repositories own all SQL and use placeholders, and one error middleware emits the uniform `{ error: { code, message } }` envelope.
 - The hardening baseline is Helmet, scoped CORS, `express.json({ limit: "16kb" })`, Zod validation, database constraints, parameterized `pg` queries, generic client-facing failures, environment-based secrets, and a non-root backend image installed with production dependencies only.

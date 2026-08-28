@@ -15,6 +15,7 @@ function formatCreatedAt(iso: string): string {
 
 interface TodoItemProps {
   todo: Todo
+  accessibleName?: string
   isEditing: boolean
   editDisabled: boolean
   onToggle: (todo: Todo, owner?: symbol) => Promise<Todo>
@@ -29,6 +30,7 @@ interface TodoItemProps {
 
 export function TodoItem({
   todo,
+  accessibleName = todo.description,
   isEditing,
   editDisabled,
   onToggle,
@@ -41,7 +43,7 @@ export function TodoItem({
   onReleaseOwner,
 }: TodoItemProps) {
   const { description, completed, createdAt } = todo
-  const label = completed ? `Completed: ${description}` : description
+  const label = completed ? `Completed: ${accessibleName}` : accessibleName
   const [draft, setDraft] = useState(description)
   const [saving, setSaving] = useState(false)
   const [toggling, setToggling] = useState(false)
@@ -142,7 +144,7 @@ export function TodoItem({
           aria-busy={toggling}
           // Named for the todo, not the state: `checked` already carries
           // completion, and a state-based name reads identically on every row.
-          aria-label={description}
+          aria-label={accessibleName}
         />
       </label>
       {isEditing ? (
@@ -200,7 +202,7 @@ export function TodoItem({
           ref={editButtonRef}
           type="button"
           className="todo-item__action"
-          aria-label={`Edit todo: ${description}`}
+          aria-label={`Edit todo: ${accessibleName}`}
           onClick={() => {
             setDraft(description)
             setEditError(null)
@@ -228,7 +230,7 @@ export function TodoItem({
           ref={deleteButtonRef}
           type="button"
           className="todo-item__action"
-          aria-label={`Delete todo: ${description}`}
+          aria-label={`Delete todo: ${accessibleName}`}
           data-todo-delete-id={todo.id}
           onClick={() => {
             if (deleteButtonRef.current) {

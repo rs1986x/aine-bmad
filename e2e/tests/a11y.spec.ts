@@ -21,6 +21,8 @@ import {
 // those states deterministic; the rendered DOM is all axe needs.
 // `stack.spec.ts` still owns the real backend-down proof.
 
+test.describe.configure({ retries: 0 })
+
 // Eight rows with realistic (UUID-stamped, wrapping) descriptions. The count is
 // load-bearing: measured against the running app, the list only grows tall
 // enough to paint a row behind the vertically centred dialog somewhere between
@@ -40,33 +42,40 @@ test('populated list is free of critical and serious violations', async ({ page 
   const active = uniqueTodo('a11y-active')
   const done = uniqueTodo('a11y-completed')
 
-  await openApp(page)
-  await addTodo(page, active)
-  await addTodo(page, done)
-  await toggleTodo(page, done, false)
+  try {
+    await interceptTodoList(page, (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }),
+    )
+    await openApp(page)
+    await addTodo(page, active)
+    await addTodo(page, done)
+    await toggleTodo(page, done, false)
 
-  const activeRow = todoItem(page, active)
-  const completedRow = todoItem(page, done, true)
-  await expect(completedRow).toBeVisible()
-  // Completion is carried by checkbox state plus strike-through, never by color
-  // alone — assert both cues before handing the DOM to axe.
-  await expect(rowCheckbox(page, done, true)).toBeChecked()
-  await expect(completedRow.getByText(done, { exact: true })).toHaveCSS(
-    'text-decoration-line',
-    'line-through',
-  )
-  await expect(activeRow).toBeVisible()
+    const activeRow = todoItem(page, active)
+    const completedRow = todoItem(page, done, true)
+    await expect(completedRow).toBeVisible()
+    // Completion is carried by checkbox state plus strike-through, never by color
+    // alone — assert both cues before handing the DOM to axe.
+    await expect(rowCheckbox(page, done, true)).toBeChecked()
+    await expect(completedRow.getByText(done, { exact: true })).toHaveCSS(
+      'text-decoration-line',
+      'line-through',
+    )
+    await expect(activeRow).toBeVisible()
 
-  // `.todo-item__actions` sits at `opacity: 0` until its row is hovered or holds
-  // focus, and axe's paint-sensitive rules skip what is not drawn. Reveal both
-  // rows — one by hover, one by focus — so Edit and Delete are actually part of
-  // the scanned surface rather than silently excluded from it.
-  await completedRow.hover()
-  await rowCheckbox(page, active).focus()
-  await expect(activeRow.locator('.todo-item__actions')).toHaveCSS('opacity', '1')
-  await expect(completedRow.locator('.todo-item__actions')).toHaveCSS('opacity', '1')
+    // `.todo-item__actions` sits at `opacity: 0` until its row is hovered or holds
+    // focus, and axe's paint-sensitive rules skip what is not drawn. Reveal both
+    // rows — one by hover, one by focus — so Edit and Delete are actually part of
+    // the scanned surface rather than silently excluded from it.
+    await completedRow.hover()
+    await rowCheckbox(page, active).focus()
+    await expect(activeRow.locator('.todo-item__actions')).toHaveCSS('opacity', '1')
+    await expect(completedRow.locator('.todo-item__actions')).toHaveCSS('opacity', '1')
 
-  await scanState(page, 'populated-list', [])
+    await scanState(page, 'populated-list', [])
+  } finally {
+    await page.unroute(TODOS_ROUTE)
+  }
 })
 
 test('empty state is free of critical and serious violations', async ({ page }) => {
@@ -139,9 +148,16 @@ test('open delete dialog is free of critical and serious violations', async ({ p
     // check as undecided rather than passing. `scanState` measures the pair
     // itself — 6.00:1, resolved in docs/accessibility-audit.md.
     await scanState(page, 'delete-dialog-open', [
-      { id: 'color-contrast', messageKeys: ['elmPartiallyObscuring'], nodeCount: 1 },
+      {
+        id: 'color-contrast',
+        messageKeys: ['elmPartiallyObscuring'],
+        nodeCount: 1,
+        targets: ['#[react-id] <p class="delete-dialog__description">'],
+      },
     ])
   } finally {
+    const dialog = page.getByRole('dialog', { name: 'Delete this todo?' })
+    if (await dialog.isVisible()) await page.keyboard.press('Escape')
     await page.unroute(TODOS_ROUTE)
   }
 })

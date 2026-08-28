@@ -1,16 +1,21 @@
 import { expect, test } from '@playwright/test'
 
 import {
+  AXE_STATES,
+  WCAG_TAGS,
+  assertReadableContrast,
   blockingViolations,
+  missingAxeStates,
   summarizeIncomplete,
   type ScannedIncomplete,
   type ScannedViolation,
 } from '../support/a11y'
 
-// The scans themselves can only ever report what the app does. These exercise
-// the gate against synthetic results so a mistyped tag list or impact filter
-// cannot quietly turn every future run into a clean pass. No browser and no
-// `axe-results/` write: these are pure functions.
+test.describe.configure({ retries: 0 })
+
+// The scans themselves can only ever report what the app does. These self-tests
+// pin the configuration and exercise failure paths so a gate regression cannot
+// quietly turn every future run into a clean pass.
 
 function violation(id: string, impact?: string | null): ScannedViolation {
   return {
@@ -24,13 +29,19 @@ function violation(id: string, impact?: string | null): ScannedViolation {
 function incomplete(id: string, messageKeys: (string | undefined)[]): ScannedIncomplete {
   return {
     id,
-    nodes: messageKeys.map((messageKey) => ({
+    nodes: messageKeys.map((messageKey, index) => ({
+      target: [`#${id}-${index}`],
+      html: `<p class="${id}-${index}">Example</p>`,
       any: [{ data: messageKey === undefined ? null : { messageKey } }],
       all: [],
       none: [],
     })),
   }
 }
+
+test('the gate uses exactly the required WCAG 2.1 A and AA tags', () => {
+  expect(WCAG_TAGS).toEqual(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+})
 
 test('the gate blocks critical, serious, and unrated violations', () => {
   const blocked = blockingViolations([
@@ -75,8 +86,21 @@ test('incomplete results reduce to rule id, message keys, and node count', () =>
       incomplete('aria-allowed-attr', [undefined]),
     ]),
   ).toEqual([
-    { id: 'aria-allowed-attr', messageKeys: [], nodeCount: 1 },
-    { id: 'color-contrast', messageKeys: ['elmPartiallyObscuring'], nodeCount: 2 },
+    {
+      id: 'aria-allowed-attr',
+      messageKeys: [],
+      nodeCount: 1,
+      targets: ['#aria-allowed-attr-0 <p class="aria-allowed-attr-0">'],
+    },
+    {
+      id: 'color-contrast',
+      messageKeys: ['elmPartiallyObscuring'],
+      nodeCount: 2,
+      targets: [
+        '#color-contrast-0 <p class="color-contrast-0">',
+        '#color-contrast-1 <p class="color-contrast-1">',
+      ],
+    },
   ])
 })
 
@@ -85,4 +109,32 @@ test('an incomplete result that changes its message key no longer matches', () =
   const drifted = summarizeIncomplete([incomplete('color-contrast', ['bgImage'])])
 
   expect(drifted).not.toEqual(pinned)
+})
+
+test('an incomplete result that moves to another target no longer matches', () => {
+  const pinned = incomplete('color-contrast', ['elmPartiallyObscuring'])
+  const moved = incomplete('color-contrast', ['elmPartiallyObscuring'])
+  moved.nodes[0]!.target = ['#different-target']
+
+  expect(summarizeIncomplete([moved])).not.toEqual(summarizeIncomplete([pinned]))
+})
+
+test('the evidence manifest requires every scanned state', () => {
+  const complete = AXE_STATES.map((state) => `${state}.json`)
+  expect(missingAxeStates(complete)).toEqual([])
+  expect(missingAxeStates(complete.filter((fileName) => fileName !== 'load-failure.json'))).toEqual(
+    ['load-failure'],
+  )
+})
+
+test('direct contrast enforcement rejects an unreadable unresolved result', async ({ page }) => {
+  await page.setContent(
+    '<main style="background: rgb(255, 255, 255)">' +
+      '<p class="low-contrast" style="color: rgb(170, 170, 170)">Unreadable text</p>' +
+      '</main>',
+  )
+
+  await expect(
+    assertReadableContrast(page, 'synthetic-low-contrast', ['.low-contrast']),
+  ).rejects.toThrow()
 })
