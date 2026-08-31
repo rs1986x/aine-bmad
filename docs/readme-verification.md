@@ -16,9 +16,9 @@ The reviewed baseline was commit
 
 ### Dependencies and static checks
 
-The README's three independent `npm ci` commands completed successfully with
-zero reported vulnerabilities. Frontend, backend, and E2E lint and strict
-type-check commands all exited successfully.
+The README's three independent `npm ci` commands completed successfully.
+Frontend, backend, and E2E lint and strict type-check commands all exited
+successfully. Dependency audit is a CI job (`npm audit`), not part of `npm ci`.
 
 ```bash
 (cd frontend && npm ci)
@@ -71,11 +71,16 @@ docker compose -f docker-compose.test.yml down -v
 
 ### Production Compose and API smoke test
 
-`docker compose up -d --build --wait --wait-timeout 180` built both application
-images and health-gated all three services successfully. A transient Docker Hub
-timeout occurred while initially resolving `docker/dockerfile:1`; retrying the
-registry download and the same Compose command succeeded without repository
-changes.
+The README Quick Start command is the foreground `docker compose up --build`.
+Evidence used the detached equivalent
+`docker compose up -d --build --wait --wait-timeout 180` (the same health-gated
+stack CI uses) so the process could return and the curl checks could run. The
+operator command was not re-run attached.
+
+That detached command built both application images and health-gated all three
+services successfully. A transient Docker Hub timeout occurred while initially
+resolving `docker/dockerfile:1`; retrying the registry download and the same
+Compose command succeeded without repository changes.
 
 The smoke checks returned:
 
@@ -91,10 +96,22 @@ database volume.
 ### Local development
 
 The documented test database and non-overwriting environment setup succeeded.
+
+```bash
+docker compose -f docker-compose.test.yml up -d --wait
+[ -e backend/.env ] || cp .env.example backend/.env
+cd backend && npm run dev
+cd frontend && npm run dev
+```
+
 The backend started on port `8080`, Vite started on port `5173`, and a request
 through Vite's `/api` proxy returned
 `200 {"status":"ok","db":"up"}`. Both development servers were then stopped,
 the test database removed, and the generated ignored `backend/.env` deleted.
+
+```bash
+docker compose -f docker-compose.test.yml down -v
+```
 
 ### Full-stack E2E
 

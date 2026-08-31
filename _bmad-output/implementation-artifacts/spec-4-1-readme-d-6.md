@@ -47,6 +47,19 @@ context:
 - [x] `README.md` -- author overview, accurate prerequisites, one-command run/stop/reset, architecture, API reference, local development, all test/coverage levels, CI summary, and code-backed troubleshooting.
 - [x] `docs/readme-verification.md` -- archive environment, verbatim README commands, outcomes, and any bounded caveats so later QA reporting can reproduce D-6 claims.
 
+### Review Findings
+
+- [x] [Review][Patch] Record a bounded caveat that Quick Start's `docker compose up --build` was evidenced via the detached `--wait` form [docs/readme-verification.md:72] — resolved from decision: keep the operator command; do not re-run or change Quick Start
+- [x] [Review][Patch] Local-dev start/stop commands not archived as exact commands [docs/readme-verification.md:91]
+- [x] [Review][Patch] `node:24-alpine` is an unlabeled floating tag [README.md:18]
+- [x] [Review][Patch] Local Development shares the test Compose project without warning that tmpfs data is ephemeral and backend-test `down -v` destroys it [README.md:159]
+- [x] [Review][Patch] Unhealthy-service troubleshooting inspects the default Compose project, not `aine-bmad-e2e` [README.md:280]
+- [x] [Review][Patch] Linux operators are not told to use `playwright install --with-deps` locally [README.md:289]
+- [x] [Review][Patch] Verification claims `npm ci` reported zero vulnerabilities [docs/readme-verification.md:19]
+- [x] [Review][Patch] API reference omits PATCH partial-update/`completed:false` and that idempotent retry returns 201 [README.md:111]
+- [x] [Review][Patch] Quick Start does not say how to know the stack is ready; Ctrl+C wording conflicts with `down` [README.md:30]
+- [x] [Review][Patch] Spec verification E2E command omits Compose project isolation [_bmad-output/implementation-artifacts/spec-4-1-readme-d-6.md:69]
+
 **Acceptance Criteria:**
 - Given a clean Docker-capable machine, when an operator follows only the Quick Start, then `docker compose up --build` health-gates the stack and serves the SPA plus healthy `/api` endpoints at `http://localhost:8080` without undocumented setup.
 - Given Node 24+ and Docker Compose v2, when each documented lint, typecheck, Vitest/RTL, Supertest/PostgreSQL integration, coverage, and Playwright command is followed verbatim, then it succeeds and the README identifies the 70% frontend/backend coverage gates and report locations.
@@ -66,7 +79,7 @@ Treat runtime configuration and tests as the contract when planning artifacts di
 - `docker compose up -d --build --wait --wait-timeout 180` plus `curl -fsS` checks for `/`, `/api/health`, and `/api/todos` -- expected: all services healthy and implemented payloads returned.
 - Per-package `npm ci`, `npm run lint`, and `npm run typecheck` -- expected: clean installation and zero diagnostics.
 - Frontend and backend `npm run test:coverage` with the documented isolated test database setup -- expected: suites pass and every configured metric remains at or above 70%.
-- `cd e2e && npx playwright install chromium && npm test` with the stack running -- expected: the full Playwright suite passes.
+- `COMPOSE_PROJECT_NAME=aine-bmad-e2e docker compose up -d --build --wait --wait-timeout 180`, then `cd e2e && npx playwright install chromium && COMPOSE_PROJECT_NAME=aine-bmad-e2e npm test`, then `COMPOSE_PROJECT_NAME=aine-bmad-e2e docker compose down -v` -- expected: the full Playwright suite passes without touching Quick Start data.
 - Re-run the README commands exactly in documented order -- expected: no missing prerequisite, environment, directory, or teardown step.
 
 ## Suggested Review Order

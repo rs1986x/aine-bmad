@@ -16,8 +16,8 @@ no authentication or user isolation.
 - Port `8080` available on the host.
 
 The Compose images are `postgres:18.4`, `node:24-alpine`, and
-`nginx:stable-alpine`. The nginx tag is floating; it does not identify a fixed
-nginx patch version.
+`nginx:stable-alpine`. The `node:24-alpine` and `nginx:stable-alpine` tags
+are floating; they do not identify a fixed Node or nginx patch version.
 
 ### Run
 
@@ -28,11 +28,13 @@ docker compose up --build
 ```
 
 Compose builds the application images, starts PostgreSQL, runs backend
-migrations, and starts nginx only after the database and API are healthy. Open
+migrations, and starts nginx only after the database and API are healthy. When
+the `frontend` service reports healthy in the logs, open
 <http://localhost:8080>. nginx serves the SPA and proxies `/api` on the same
-origin. No `.env` file or local Node installation is needed for this path. This
-foreground command keeps its terminal occupied; use another terminal for the
-commands below, or press Ctrl+C before stopping the stack.
+origin. No `.env` file or local Node installation is needed for this path.
+This foreground command keeps its terminal occupied; use another terminal for
+later commands. Ctrl+C stops the containers but leaves them created;
+`docker compose down` (below) removes them without deleting todos.
 
 > **Local-only security boundary:** Compose publishes port `8080` on the Docker
 > host. On systems that expose published ports to the local network, other
@@ -108,12 +110,12 @@ Descriptions are trimmed and must contain 1–500 characters. IDs and optional
 | `GET` | `/api/health` | — | `200 {"status":"ok","db":"up"}` |
 | `GET` | `/api/todos` | — | `200 Todo[]`, newest first |
 | `POST` | `/api/todos` | `{"description":"…"}` | `201 Todo` |
-| `PATCH` | `/api/todos/:id` | `{"description":"…"}`, `{"completed":true}`, or both | `200 Todo` |
+| `PATCH` | `/api/todos/:id` | any non-empty subset of `description` and `completed` (`true` or `false`); omitted fields stay unchanged | `200 Todo` |
 | `DELETE` | `/api/todos/:id` | — | `204`, no body |
 
 `POST` accepts an optional `Idempotency-Key` UUID. Repeating the same key and
-description returns the original Todo; reusing it for another description
-returns `409`.
+description returns `201` with the original Todo; reusing it for another
+description returns `409`.
 
 Except for health probes, failures use:
 
@@ -156,7 +158,11 @@ There is no root npm workspace. Install each package independently:
 Commands in this section use POSIX shell syntax as available in macOS, Linux,
 WSL, and Git Bash.
 
-Start the isolated PostgreSQL service and prepare backend configuration:
+Start the isolated PostgreSQL service and prepare backend configuration.
+This is the same `aine-bmad-test` Compose project used by backend tests: tmpfs
+storage (todos vanish when that container stops), not the production `db-data`
+volume. The backend-test `down -v` commands below also destroy this database
+if local development is still using it.
 
 ```bash
 docker compose -f docker-compose.test.yml up -d --wait
@@ -277,9 +283,12 @@ lives in `docs/accessibility-audit.md` and `docs/security-review.md`.
 - **Port already allocated:** stop the process using `8080` (production/backend),
   `5173` (Vite), or `5432` (test PostgreSQL). Do not run the local backend and
   production stack together because both use `8080`.
-- **A service is unhealthy:** inspect it with `docker compose ps` and
-  `docker compose logs db backend frontend`. `/api/health` returns `503` while
-  PostgreSQL cannot answer `SELECT 1`.
+- **A service is unhealthy:** inspect the matching Compose project. Quick Start
+  uses the default project (`docker compose ps` and
+  `docker compose logs db backend frontend`). The E2E stack needs
+  `COMPOSE_PROJECT_NAME=aine-bmad-e2e` on those same commands. The test
+  database uses `docker compose -f docker-compose.test.yml ps` and `logs`.
+  `/api/health` returns `503` while PostgreSQL cannot answer `SELECT 1`.
 - **Backend exits before listening:** local development requires
   `NODE_ENV`, `PORT`, `DATABASE_URL`, and `CORS_ORIGIN`. Recreate
   `backend/.env` from `.env.example`; Compose supplies these values itself.
@@ -287,8 +296,9 @@ lives in `docs/accessibility-audit.md` and `docs/security-review.md`.
   and host port `5432` is free. Run the test command with all four inline
   environment variables exactly as shown above.
 - **Playwright cannot launch Chromium:** rerun
-  `cd e2e && npx playwright install chromium`. On Linux, CI uses
-  `npx playwright install --with-deps chromium` to install OS dependencies too.
+  `cd e2e && npx playwright install chromium`. On Linux, also install OS
+  dependencies with `cd e2e && npx playwright install --with-deps chromium`
+  (CI uses the same command).
 - **An upgraded checkout starts with an empty database:** PostgreSQL 18 stores
   data below `/var/lib/postgresql/<major>/docker`, while older project volumes
   may have used `/var/lib/postgresql/data`. If old data is disposable, run
