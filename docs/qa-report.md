@@ -67,6 +67,9 @@ Story 4.3 formalized the preserved Story 3.2/3.3 evidence as the canonical
 [D-9 security review](security-review.md). This report links those stakeholder
 deliverables without duplicating their methods, conclusions, or residual risks.
 
+The chronological AI-usage record is the
+[D-10 AI integration log](ai-integration-log.md).
+
 ## Coverage evidence
 
 Fresh local runs passed the configured 70% package-wide gate for every metric:

@@ -276,8 +276,9 @@ GitHub Actions runs four blocking jobs on pushes and pull requests:
 
 Coverage, Playwright, dependency-audit, accessibility, and failure-log artifacts
 are retained by CI for seven days. The formal stakeholder reports are
-[D-8 — Accessibility review](docs/accessibility-audit.md) and
-[D-9 — Security review](docs/security-review.md).
+[D-8 — Accessibility review](docs/accessibility-audit.md),
+[D-9 — Security review](docs/security-review.md), and
+[D-10 — AI integration log](docs/ai-integration-log.md).
 The consolidated test strategy, traceability, defects, and reproducible coverage
 evidence live in `docs/qa-report.md`.
 
