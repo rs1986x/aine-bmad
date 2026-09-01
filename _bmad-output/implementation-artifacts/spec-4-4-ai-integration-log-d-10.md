@@ -48,7 +48,7 @@ context:
 - `_bmad-output/implementation-artifacts/{1-1,1-2,1-3,1-4,2-1,2-2,2-3}-*.md` -- `## Dev Agent Record` / `### Agent Model Used`: Opus 4.8 (Cursor) on 1.1–2.2; GPT-5.6 Sol on 2.3. Also their Review Findings.
 - `_bmad-output/implementation-artifacts/spec-{2-4,2-5,3-1,3-2,3-3,4-1,4-2,4-3}-*.md` -- human-owned `<frozen-after-approval>` plus Review Findings / Spec Change Logs; **no** Agent Model Used.
 - `_bmad-output/implementation-artifacts/deferred-work.md:1-9` -- `bmad-code-review` deferrals as the cross-story human-correction ledger.
-- `_bmad-output/implementation-artifacts/sprint-status.yaml:35-36,83` -- “different LLM recommended” for code review; Story 4.4 still `backlog`.
+- `_bmad-output/implementation-artifacts/sprint-status.yaml:35-36,83` -- “different LLM recommended” for code review; Story 4.4 status is tracked here and is no longer `backlog`.
 - `docs/qa-report.md:10-17,65-68` -- reuse evidence-label vocabulary; add a D-10 discovery sentence after the D-8/D-9 links. No record of who authored the QA report — label that identity Gap.
 - `docs/{accessibility-audit.md:1-36,security-review.md}` -- read-only pattern for bounded conclusion and labels; do not rewrite.
 - `README.md:277-282` -- add D-10 beside D-8/D-9; do not expand the operator guide into the log.
@@ -67,6 +67,10 @@ context:
 - Given implementation artifacts, when the development section is read, then agent models are named only for stories 1.1–2.3, review corrections cite Review Findings or `deferred-work.md`, and stories 2.4–4.3 state model identity as Gap.
 - Given incomplete records, when a prompt, CI URL, or author identity is missing, then D-10 labels it Gap and does not fill it from inference.
 - Given completed D-10, when a stakeholder follows README or QA-report links, then the log is reachable without reading implementation specs.
+
+### Review Findings
+
+- [x] [Review][Patch] Spec Code Map still calls Story 4.4 backlog [_bmad-output/implementation-artifacts/spec-4-4-ai-integration-log-d-10.md:51]
 
 ## Spec Change Log
 

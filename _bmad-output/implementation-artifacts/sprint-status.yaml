@@ -1,5 +1,5 @@
 # generated: 2026-06-16
-# last_updated: 2026-09-01 (story 4-4 → review)
+# last_updated: 2026-09-01 (story 4-4 and epic-4 → done)
 # project: aine-bmad
 # project_key: NOKEY
 # tracking_system: file-system
@@ -76,9 +76,9 @@ development_status:
 
   # --- Epic 4: Deliverable Documentation & Reporting ---
   # README, QA report + coverage evidence, accessibility + security reports, AI integration log.
-  epic-4: in-progress
+  epic-4: done
   4-1-readme-d-6: done
   4-2-qa-report-coverage-evidence-d-7: done
   4-3-accessibility-and-security-review-reports-d-8-d-9: done
-  4-4-ai-integration-log-d-10: review
+  4-4-ai-integration-log-d-10: done
   epic-4-retrospective: optional
