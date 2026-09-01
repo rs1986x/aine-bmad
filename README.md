@@ -277,6 +277,8 @@ GitHub Actions runs four blocking jobs on pushes and pull requests:
 Coverage, Playwright, dependency-audit, accessibility, and failure-log artifacts
 are retained by CI for seven days. Detailed accessibility and security evidence
 lives in `docs/accessibility-audit.md` and `docs/security-review.md`.
+The consolidated test strategy, traceability, defects, and reproducible coverage
+evidence live in `docs/qa-report.md`.
 
 ## Troubleshooting
 
