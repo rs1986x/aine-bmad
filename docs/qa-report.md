@@ -56,15 +56,16 @@ the successful clean rerun.
 | FR-7 CRUD API | `todo.schema.test.ts`, `todo.service.test.ts`, `todo.repository.test.ts`, `todo.api.test.ts`, `security.api.test.ts` | **Partial** — CRUD paths pass, but a NUL description returns 500 instead of required validation 400 |
 | NFR-1 Responsiveness | Timed curl and operator observation below; `crud.spec.ts` proves behavior but contains no timing assertions | **Partial / limited observation** — two GET endpoints and one create UI reaction measured |
 | NFR-2 Reliability/error handling | `api.test.ts`, `useTodos.test.tsx`, `ErrorBanner.test.tsx`, `errorHandler.test.ts`, `todo.api.test.ts`, `security.api.test.ts`, `stack.spec.ts` | **Partial** — covered paths pass; NUL returns 500 and failed reload retains stale internal list state |
-| NFR-3 Usability/UX states | `App.test.tsx`, component tests, `a11y.spec.ts`, `keyboard.spec.ts`; [accessibility audit](accessibility-audit.md) | **Partial** — covered states pass with documented responsive/accessibility residuals |
+| NFR-3 Usability/UX states | `App.test.tsx`, component tests, `a11y.spec.ts`, `keyboard.spec.ts`; [D-8 accessibility review](accessibility-audit.md) | **Partial** — covered states pass with documented responsive/accessibility residuals |
 | NFR-4 Data integrity/durability | `todo.repository.test.ts`, `todo.api.test.ts`, `crud.spec.ts`, `stack.spec.ts` | Pass for refresh, browser session, and backend restart; remount gap open |
-| NFR-5 Maintainability/extensibility | Layering documented in README; [security review](security-review.md) NFR-5 attestation; unit boundaries above | Pass by reviewed architecture attestation |
+| NFR-5 Maintainability/extensibility | Layering documented in README; [D-9 security review](security-review.md) NFR-5 attestation; unit boundaries above | Pass by reviewed architecture attestation |
 | NFR-6 Deployability | Fresh health-gated Compose starts during E2E and responsiveness checks; `stack.spec.ts`; README smoke evidence | **Partial** — configured-machine Compose run passed; clean-machine reproducibility was not evaluated |
 | NFR-7 Testability | All five levels above plus fresh frontend/backend coverage runs | Pass |
 
-The accessibility and security links are Story 3.2/3.3 evidence. Story 4.3
-remains backlog and will formalize D-8/D-9; this report does not duplicate or
-mark those deliverables complete.
+Story 4.3 formalized the preserved Story 3.2/3.3 evidence as the canonical
+[D-8 accessibility review](accessibility-audit.md) and
+[D-9 security review](security-review.md). This report links those stakeholder
+deliverables without duplicating their methods, conclusions, or residual risks.
 
 ## Coverage evidence
 
@@ -154,7 +155,7 @@ copy of `_bmad-output/implementation-artifacts/deferred-work.md`.
 | Open | Named-volume remount durability is not proven by the backend-restart E2E | `deferred-work.md`, Story 3.1 |
 | Open | `reload()` retains a stale internal list if a later reload fails | `deferred-work.md`, Story 1.4 |
 | Open | `GET /api/todos` is unbounded (no pagination/limit) | `deferred-work.md`, Story 1.2 |
-| Open | Accessibility residuals: unscanned combinations, 320px/text-only resize gap, Chromium-only checks, non-text contrast not automated, and grouping/action visibility limitations | [Accessibility audit](accessibility-audit.md) and `deferred-work.md` |
+| Open | Accessibility residuals: unscanned combinations, 320px/text-only resize gap, Chromium-only checks, non-text contrast not automated, and grouping/action visibility limitations | [D-8 accessibility review](accessibility-audit.md) and `deferred-work.md` |
 | Open | E2E Add actions use non-exact `"Add"` role locators; a generated description containing “add” caused strict-mode matches against Edit/Delete names. A clean rerun passed, demonstrating intermittent suite behavior; it does not prove the defect harmless. | Fresh 2026-09-01 run; `e2e/support/app.ts:67`, `e2e/tests/stack.spec.ts:42`; test change requires approval |
 | Resolved | Requests now use AbortController/supersession and a 10s timeout | Story 2.5, recorded in `deferred-work.md` |
 | Resolved | Stable heading exists across app states | Story 3.2, `App.test.tsx` |

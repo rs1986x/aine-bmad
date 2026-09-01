@@ -1,8 +1,51 @@
-# Accessibility audit — WCAG 2.1 AA
+# D-8 — Accessibility review report
 
-Story 3.2. Records what was scanned, what was checked by hand, what axe could not
-decide on its own, and what is still open. Story 4.3 turns this into the formal
-report; nothing here is a projection — every line is an outcome that was observed.
+Formal stakeholder deliverable for Story 4.3, based on the Story 3.2 WCAG 2.1
+AA audit observed on **2026-08-28**. This report preserves that dated evidence;
+it does not refresh the audit or claim that the current checkout was rescanned.
+
+## Executive conclusion
+
+**Bounded attestation:** For the requested WCAG 2.1 A/AA tags in the five scanned
+states, the verified 2026-08-28 Chromium evidence found zero critical or serious
+axe violations and zero violations at any impact level. axe left one
+serious-impact `color-contrast` check incomplete rather than passing it; direct
+measurement resolved the rendered pair at **6.00:1** against a 4.5:1 threshold.
+
+Keyboard order, visible focus, dialog behavior, non-color completion cues,
+effective hit areas, and reflow at the tested 640×360 condition were also
+verified. Announcements were inspected through React Testing Library/DOM
+assertions and Chromium's accessibility tree, **not through a live screen-reader
+session**.
+
+This is not a claim of full WCAG conformance. Seven residual items remain,
+combining observed limitations with unverified coverage gaps: text-only resize,
+non-Chromium engines, 320px reflow, maintenance of the layout-sensitive
+incomplete pin, missing grouping semantics, hover-dependent row action
+visibility, and non-automated icon contrast. They are detailed in
+[Residual items](#residual-items). The 2026-08-28 source revision was not
+recorded, so that historical run cannot be independently re-downloaded.
+
+## Evidence labels
+
+- **Verified (2026-08-28):** observed in the dated Story 3.2 run against the
+  production-style local Compose stack.
+- **Historical:** preserved evidence from that run; it was not repeated for
+  Story 4.3.
+- **Attestation:** a bounded interpretation or inspected architectural property,
+  not an automated result.
+- **Unverified / out of scope:** no supporting run exists and no conclusion is
+  inferred.
+- **Reproducibility:** committed test/source paths and commands that can produce
+  a new result. Generated `e2e/axe-results/` files are intentionally not
+  committed.
+
+Generated accessibility artifacts uploaded by CI are retained for seven days.
+The exact source revision for the 2026-08-28 run was not recorded, so the
+historical artifact cannot be tied to an immutable revision or assumed to
+remain downloadable. This archival limitation does not alter the dated observed
+results, but it limits independent verification of that historical run; the
+committed harness and command below can only produce a new point-in-time result.
 
 ## Scope and method
 
@@ -16,6 +59,16 @@ report; nothing here is a projection — every line is an outcome that was obser
 | Harness    | `e2e/tests/a11y.spec.ts` (scans), `e2e/tests/keyboard.spec.ts` (keyboard, focus, hit areas, reflow), `e2e/tests/a11y-gate.spec.ts` (gate self-test), helper in `e2e/support/a11y.ts`                                                             |
 | Gate       | Any `critical`, `serious`, or **unrated** violation fails the E2E job, as does any change to the pinned `incomplete` set or any undecided contrast check that measures below threshold. Per-state JSON is uploaded from CI on pass **and** fail. |
 | Evidence   | `e2e/axe-results/{state}.json`, each holding `violations` **and** `incomplete`                                                                                                                                                                   |
+
+All dated outcomes below are **Historical — verified on 2026-08-28** unless a
+paragraph is explicitly labeled attestation, unverified, out of scope, or
+reproducibility.
+
+### Current harness behavior — Reproducibility
+
+The following gate behavior describes the presently committed harness, not an
+additional 2026-08-28 observation. Rerunning it produces a new point-in-time
+result rather than extending the historical result.
 
 The gate fails closed. A violation axe leaves without an impact rating blocks
 exactly like a `critical` one, because "unrated" is the one case where treating
@@ -39,17 +92,37 @@ files exist, so a renamed, removed, or skipped scan cannot masquerade as complet
 evidence.
 
 No axe rule, tag, or selector is disabled, excluded, or narrowed anywhere in the
-harness. `best-practice`, WCAG 2.2, and AAA rules are out of scope for this story
+harness. `best-practice`, WCAG 2.2, and AAA rules are out of scope for Story 3.2
 and are simply not requested.
 
-Reproduce with:
+Reproduce a new point-in-time result in an isolated Compose project. The script
+forces its own project name and compose file so an inherited `COMPOSE_PROJECT_NAME`
+or `COMPOSE_FILE` cannot target another stack. Host ports published by
+`docker-compose.yml` (including `8080`) must be free.
 
 ```bash
-docker compose up -d --build --wait
-cd e2e && npm test
+(
+  set -eu
+  ROOT=$(git rev-parse --show-toplevel)
+  cd "$ROOT"
+  COMPOSE_PROJECT_NAME="aine-bmad-a11y-review-$(date +%Y%m%d%H%M%S)-$$"
+  export COMPOSE_PROJECT_NAME
+  unset COMPOSE_FILE
+  cleanup() {
+    (cd "$ROOT" && docker compose -f docker-compose.yml --project-directory "$ROOT" down -v --remove-orphans)
+  }
+  trap cleanup EXIT
+  trap 'exit 129' HUP
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  cleanup
+  (cd e2e && npm ci && npx playwright install chromium)
+  docker compose -f docker-compose.yml --project-directory "$ROOT" up -d --build --wait --wait-timeout 180
+  (cd e2e && npm test)
+)
 ```
 
-## Automated scan results
+## Automated scan results — Historical, verified 2026-08-28
 
 Five DOM states, one scan each. Four of them — populated, empty, load failure,
 and delete dialog — intercept the initial `GET /api/todos`, because the local
@@ -69,8 +142,8 @@ containers.
 | Delete dialog open                          | `delete-dialog-open.json` | 0                | 0                | 1          |
 | Load failure                                | `load-failure.json`       | 0                | 0                | 0          |
 
-Total across all five states: **zero violations at any impact level**, one
-`incomplete` result, resolved below.
+For the requested WCAG 2.1 A/AA tags across these five states: **zero violations
+at any impact level**, plus one `incomplete` result resolved below.
 
 The populated-list scan deliberately reveals a row's action buttons first — one
 row by hover, one by focus — because `.todo-item__actions` sits at `opacity: 0`
@@ -84,7 +157,7 @@ contain no text — only an `aria-hidden` SVG. Icon contrast is therefore outsid
 what any requested rule can see, and is covered by measurement in the residual
 items instead.
 
-## Incomplete axe results and their resolution
+## Incomplete axe results and their resolution — Historical, verified 2026-08-28
 
 An `incomplete` is a check axe could not decide on its own. It is never counted
 as a pass; each one below was resolved by measurement.
@@ -106,18 +179,19 @@ as a pass; each one below was resolved by measurement.
   text. Foreground is `rgb(91, 100, 112)` (`--color-ink-secondary`).
 - **Computed ratio:** **6.00:1** against the 4.5:1 threshold for normal text.
 - **Verdict:** pass. No code change made or needed.
-- **Now enforced, not just recorded.** That measurement used to live only in this
-  document. `scanState` now performs it on every run: for each `color-contrast`
-  result axe leaves `incomplete`, it resolves the node, walks to the first fully
-  opaque ancestor background, and asserts the WCAG ratio against 4.5:1 (3:1 for
-  large text). Verified by injecting `rgb(170, 170, 170)` on this paragraph — the
-  run fails with `Received: 2.32`.
+- **Reproducibility property — current harness:** `scanState` performs this
+  measurement on every run. For each `color-contrast` result axe leaves
+  `incomplete`, it resolves the node, walks to the first fully opaque ancestor
+  background, and asserts the WCAG ratio against 4.5:1 (3:1 for large text).
+  The committed gate self-test rejects an injected `rgb(170, 170, 170)` pair at
+  2.32:1. This describes current enforcement, not a refreshed audit outcome.
 
 **Pinning this entry alone would not have been enough**, and it is worth being
 precise about why, because it is counter-intuitive. axe reports this result with
 `contrastRatio: 0` — it has not measured anything. Injecting a 2.32:1 colour and
-re-scanning produces **zero violations and a byte-identical `incomplete` shape**:
-same rule id, same `elmPartiallyObscuring` message key, same single node. So a
+re-scanning with the requested WCAG 2.1 A/AA tags produces **zero violations and
+a byte-identical `incomplete` shape**: same rule id, same
+`elmPartiallyObscuring` message key, same single node. So a
 pin keyed on those fields passes an unreadable dialog exactly as happily as a
 readable one. The pin is real drift detection for the _set_ of undecided checks;
 the direct measurement above is what actually decides the colours.
@@ -135,10 +209,11 @@ fixed eight-row list, and asserts before scanning that a row really is behind th
 description — so if the layout ever changes, the test reports that cause instead
 of a mystifying pin mismatch.
 
-## Keyboard, focus, dialog, and reflow checks
+## Keyboard, focus, dialog, and reflow checks — Historical, verified 2026-08-28
 
-These run as real browser assertions in `e2e/tests/keyboard.spec.ts`, so they are
-re-checked on every CI run rather than being a one-off manual note.
+The table records the historical browser outcomes. **Reproducibility property —
+current harness:** these checks are committed as browser assertions in
+`e2e/tests/keyboard.spec.ts`; CI is configured to rerun them.
 
 | Check                | Observed outcome                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -160,14 +235,14 @@ viewport, which is what Chrome's page zoom actually does to px-sized layouts.
 Recorded as a residual item below rather than treated as a passing text-resize
 proof.
 
-## Non-color completion cue
+## Non-color completion cue — Historical, verified 2026-08-28
 
 Asserted in `e2e/tests/a11y.spec.ts` before the populated-list scan: a completed
 row's checkbox is `checked` **and** its description computes
 `text-decoration-line: line-through`. Its list item is additionally named
 `Completed: {description}`. Completion is never conveyed by color alone.
 
-## Effective hit areas
+## Effective hit areas — Historical, verified 2026-08-28
 
 Measured from the rendered page (width × height, CSS px):
 
@@ -184,10 +259,11 @@ Measured from the rendered page (width × height, CSS px):
 | Dialog Delete        | 79 × 50                     | —                         |
 
 Every control clears 44 × 44. The add-submit and Retry buttons previously met the
-floor only incidentally through padding; this story pinned `min-height: 44px` on
+floor only incidentally through padding; Story 3.2 pinned `min-height: 44px` on
 both so a token change cannot silently drop them below it.
 
-These are enforced two ways, because neither alone is sufficient.
+**Reproducibility property — current harness:** these checks are implemented two
+ways, because neither alone is sufficient.
 `frontend/src/styles/app.test.ts` matches the `min-height` declarations in the
 stylesheet source — jsdom lays nothing out, so a unit test can never observe a
 rendered box and can only confirm the rule is written. `e2e/tests/keyboard.spec.ts`
@@ -196,7 +272,7 @@ above, which is the box a pointer actually has to hit. The checkbox is measured
 at its wrapping `<label>`: the 22px input is deliberately nested inside a 44px
 label, and the label is what takes the click.
 
-## Accessibility tree
+## Accessibility tree and announcements — Historical, verified 2026-08-28
 
 Captured from Chromium against the running stack. This records the roles, names,
 states, headings, live regions, and alerts exposed through the browser's
@@ -247,11 +323,15 @@ one `heading "Todo" [level=1]`, with the empty state's "No todos yet." at level 
 and the delete dialog's title at level 2. No level is skipped and no state is
 without a top-level heading. Pinned by tests in `frontend/src/App.test.tsx`.
 
-Live region content immediately after an add, read from the
-`aria-live="polite"` region: `Todo added: audit …6eb9.` Failures render inside a
-`role="alert"` container instead, as shown in the load-failure tree above.
+Announcement evidence is bounded to React Testing Library assertions over the
+rendered DOM in `frontend/src/App.test.tsx` and inspection of Chromium's
+accessibility tree. The polite live region contained
+`Todo added: audit …6eb9.` immediately after an add, and failures rendered in a
+`role="alert"` container as shown above. **Live screen-reader behavior is
+unverified**: no NVDA, JAWS, VoiceOver, or other screen reader was operated in
+this audit.
 
-## Defects found and fixed in this story
+## Defects found and fixed in Story 3.2
 
 Both were standing entries in the deferred ledger; both are now closed.
 
@@ -273,23 +353,31 @@ Both were standing entries in the deferred ledger; both are now closed.
 
 ## Residual items
 
-None are critical or serious. Each is a real, observed limitation.
+**Seven open residuals remain.** The historical requested-tag scans found no
+critical or serious violations in the five scanned states, but that axe
+classification does not apply to unscanned browsers, sizes, assistive
+technologies, or rules. Labels below distinguish observed limitations from
+unverified coverage and automation gaps.
 
-1. **Text-only resize is untested and probably unsupported.** All type tokens are
+1. **Observed limitation — text-only resize is untested and probably unsupported.**
+   All type tokens are
    absolute `px`, so a browser text-only zoom (Firefox's "Zoom text only", or a
    user stylesheet raising the root font size) does not enlarge the UI — measured
    above. Full-page zoom, which is what Chrome offers and what WCAG 1.4.4 is
    normally satisfied against, works and is covered by the reflow test. Moving the
-   type ramp to `rem` would close the gap; it is a design-token change beyond this
-   story's scope.
-2. **One browser engine.** Every scan and keyboard assertion ran in Chromium
+   type ramp to `rem` would close the gap; it is a design-token change beyond
+   Story 3.2's scope.
+2. **Unverified coverage gap — one browser engine.** Every scan and keyboard
+   assertion ran in Chromium
    only — the Playwright project list has a single `chromium` entry. Firefox and
    WebKit differences (notably `:focus-visible` heuristics and checkbox rendering)
    are unverified.
-3. **Reflow is tested at one size.** The reflow test uses 640×360. The WCAG 1.4.10
+3. **Unverified coverage gap — reflow is tested at one size.** The reflow test
+   uses 640×360. The WCAG 1.4.10
    reference condition, 320 CSS px wide, is not exercised, nor is a real mobile
    device.
-4. **The pinned `incomplete` set is version- and layout-sensitive.** Drift now
+4. **Reproducibility limitation — the pinned `incomplete` set is version- and
+   layout-sensitive.** Drift now
    fails the run, which is the point. The pin uses axe's `messageKey` values,
    normalized target identity, and, for the delete dialog, a fixed eight-row
    fixture whose height puts a row behind the dialog. An axe-core upgrade that
@@ -297,16 +385,19 @@ None are critical or serious. Each is a real, observed limitation.
    will fail these scans for a reason that is not an accessibility regression.
    That failure is intentional — it forces the new set to be resolved here before
    the expectation moves — but it is maintenance the next person will have to do.
-5. **Grouping has no structural semantics.** Active and completed todos render as
+5. **Observed limitation — grouping has no structural semantics.** Active and
+   completed todos render as
    two runs inside one `<ul>` with no group headings or labels — carried over from
    the UX accessibility review's low-severity L3 finding. The per-row
    `Completed: {description}` label is the current mitigation.
-6. **Row actions are `opacity: 0` until hover or focus-within** above the 640px
-   breakpoint. They stay in the tab order and the accessibility tree (confirmed by
+6. **Observed limitation — row actions are `opacity: 0` until hover or
+   focus-within** above the 640px breakpoint. They stay in the tab order and the
+   accessibility tree (confirmed by
    the tab-order test and the trees above), and the seven rules that do evaluate
    them once revealed all pass, but sighted mouse users only see them on hover.
-7. **Icon-only control contrast is not covered by any requested axe rule.** The
-   Edit and Delete buttons hold an `aria-hidden` SVG and no text, so
+7. **Observed limitation — icon-only control contrast is not covered by
+   any requested axe rule.** The Edit and Delete buttons hold an `aria-hidden`
+   SVG and no text, so
    `color-contrast` — which measures text — never applies to them, revealed or
    not. Measured by hand instead: the icon stroke is `rgb(91, 100, 112)`
    (`--color-ink-secondary`) on the `rgb(255, 255, 255)` row surface, the same
